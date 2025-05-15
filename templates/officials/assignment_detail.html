@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}Assignment Details - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-clipboard-list me-2"></i>Assignment Details
+        </h1>
+        <div>
+            <a href="{% url 'assignment_list' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-chevron-left me-1"></i>Back to Assignments
+            </a>
+            <a href="{% url 'assignment_update' assignment.id %}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-edit me-1"></i>Edit
+            </a>
+            <a href="{% url 'assignment_delete' assignment.id %}" class="btn btn-outline-danger">
+                <i class="fas fa-trash-alt me-1"></i>Delete
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header {% if assignment.confirmed %}bg-success{% else %}bg-warning{% endif %} text-white">
+                    <h5 class="mb-0">Assignment Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Status:</div>
+                        <div class="col-md-8">
+                            {% if assignment.confirmed %}
+                                <span class="badge bg-success">Confirmed</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Role:</div>
+                        <div class="col-md-8">{{ assignment.role }}</div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Created:</div>
+                        <div class="col-md-8">{{ assignment.created_at|date:"F j, Y g:i A" }}</div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4 fw-bold">Last Updated:</div>
+                        <div class="col-md-8">{{ assignment.updated_at|date:"F j, Y g:i A" }}</div>
+                    </div>
+
+                    {% if assignment.notes %}
+                        <div class="row mb-3">
+                            <div class="col-md-4 fw-bold">Notes:</div>
+                            <div class="col-md-8">{{ assignment.notes|linebreaks }}</div>
+                        </div>
+                    {% endif %}
+
+                    <div class="mt-4">
+                        <h6 class="fw-bold">Confirmation Action:</h6>
+                        <div class="d-flex gap-2 mt-2">
+                            <form method="post" action="{% url 'assignment_update' assignment.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="confirmed" value="{% if assignment.confirmed %}False{% else %}True{% endif %}">
+                                {% if assignment.confirmed %}
+                                    <button type="submit" class="btn btn-warning btn-sm text-dark">
+                                        <i class="fas fa-times me-1"></i>Mark as Pending
+                                    </button>
+                                {% else %}
+                                    <button type="submit" class="btn btn-success btn-sm">
+                                        <i class="fas fa-check me-1"></i>Confirm Assignment
+                                    </button>
+                                {% endif %}
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="row">
+                <div class="col-md-12 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Official Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h5>{{ assignment.official.name }}</h5>
+                                    <p class="text-muted">
+                                        {{ assignment.official.email }}<br>
+                                        {% if assignment.official.phone %}{{ assignment.official.phone }}{% endif %}
+                                    </p>
+                                    <p>
+                                        <strong>Team:</strong> 
+                                        {% if assignment.official.team %}
+                                            <a href="{% url 'team_detail' assignment.official.team.id %}">
+                                                {{ assignment.official.team.name }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">None</span>
+                                        {% endif %}
+                                    </p>
+                                    <p>
+                                        <strong>Certification:</strong> 
+                                        {% if assignment.official.certification %}
+                                            {{ assignment.official.certification.name }}
+                                        {% else %}
+                                            <span class="text-muted">None</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Experience:</strong> {{ assignment.official.years_experience }} years</p>
+                                </div>
+                                {% if assignment.official.photo %}
+                                    <img src="{{ assignment.official.photo.url }}" alt="{{ assignment.official.name }}" 
+                                        class="rounded-circle" style="width: 100px; height: 100px; object-fit: cover;">
+                                {% endif %}
+                            </div>
+                            <div class="mt-3">
+                                <a href="{% url 'official_detail' assignment.official.id %}" class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-user-tie me-1"></i>View Official Profile
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header {% if assignment.meet.date < today %}bg-secondary{% elif assignment.meet.date == today %}bg-primary{% else %}bg-info{% endif %} text-white">
+                            <h5 class="mb-0">Meet Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <h5>{{ assignment.meet.name }}</h5>
+                            <p>
+                                <strong>Date:</strong> {{ assignment.meet.date|date:"l, F j, Y" }}<br>
+                                <strong>Time:</strong> {{ assignment.meet.start_time|time:"g:i A" }}
+                            </p>
+                            <p>
+                                <strong>Host Team:</strong> 
+                                <a href="{% url 'team_detail' assignment.meet.host_team.id %}">
+                                    {{ assignment.meet.host_team.name }}
+                                </a>
+                            </p>
+                            <p><strong>Location:</strong> {{ assignment.meet.location }}</p>
+                            
+                            <div class="mt-3">
+                                <a href="{% url 'meet_detail' assignment.meet.id %}" class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-swimming-pool me-1"></i>View Meet Details
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

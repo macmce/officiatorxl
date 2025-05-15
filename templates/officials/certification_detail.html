@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ certification.name }} - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-certificate me-2"></i>{{ certification.name }}
+        </h1>
+        <div>
+            <a href="{% url 'certification_list' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-chevron-left me-1"></i>Back to Certifications
+            </a>
+            <a href="{% url 'certification_update' certification.id %}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-edit me-1"></i>Edit
+            </a>
+            <a href="{% url 'certification_delete' certification.id %}" class="btn btn-outline-danger">
+                <i class="fas fa-trash-alt me-1"></i>Delete
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Certification Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ certification.name }}</p>
+                    
+                    {% if certification.abbreviation %}
+                        <p><strong>Abbreviation:</strong> {{ certification.abbreviation }}</p>
+                    {% endif %}
+                    
+                    {% if certification.level %}
+                        <p>Level {{ certification.level }}</p>
+                    {% endif %}
+
+                    {% if certification.description %}
+                        <p><strong>Description:</strong></p>
+                        <p>{{ certification.description|linebreaks }}</p>
+                    {% endif %}
+                    
+                    {% if certification.requirements %}
+                        <p><strong>Requirements:</strong></p>
+                        <p>{{ certification.requirements|linebreaks }}</p>
+                    {% endif %}
+                    
+                    {% if certification.validity_period %}
+                        <p><strong>Validity Period:</strong> {{ certification.validity_period }} 
+                        {% if certification.validity_period == 1 %}year{% else %}years{% endif %}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Officials with this Certification</h5>
+                    <a href="{% url 'official_create' %}?certification={{ certification.id }}" class="btn btn-sm btn-light">
+                        <i class="fas fa-plus me-1"></i>Add Official
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if officials %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Team</th>
+                                        <th>Email</th>
+                                        <th>Experience</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for official in officials %}
+                                        <tr>
+                                            <td>{{ official.name }}</td>
+                                            <td>{% if official.team %}{{ official.team.name }}{% else %}<span class="text-muted">None</span>{% endif %}</td>
+                                            <td>{{ official.email }}</td>
+                                            <td>{{ official.years_experience }} years</td>
+                                            <td>
+                                                <a href="{% url 'official_detail' official.id %}" class="btn btn-sm btn-outline-primary me-1">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'official_update' official.id %}" class="btn btn-sm btn-outline-secondary me-1">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <a href="{% url 'official_delete' official.id %}" class="btn btn-sm btn-outline-danger">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>No officials have this certification yet.
+                            <a href="{% url 'official_create' %}?certification={{ certification.id }}" class="alert-link">Add an official</a> with this certification.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

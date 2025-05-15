@@ -1,0 +1,313 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ user_obj.username }} - User Administration{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-user me-2"></i>User Profile: {{ user_obj.username }}
+        </h1>
+        <div>
+            <a href="{% url 'user_list' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-chevron-left me-1"></i>Back to Users
+            </a>
+            <div class="btn-group">
+                <a href="{% url 'user_update' user_obj.id %}" class="btn btn-outline-primary me-2">
+                    <i class="fas fa-edit me-1"></i>Edit
+                </a>
+                <a href="{% url 'user_roles' user_obj.id %}" class="btn btn-outline-warning me-2">
+                    <i class="fas fa-user-tag me-1"></i>Manage Roles
+                </a>
+                <a href="{% url 'user_leagues' user_obj.id %}" class="btn btn-outline-info me-2">
+                    <i class="fas fa-trophy me-1"></i>Manage Leagues
+                </a>
+                <a href="{% url 'user_delete' user_obj.id %}" class="btn btn-outline-danger">
+                    <i class="fas fa-trash-alt me-1"></i>Delete
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">User Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        {% if user_obj.profile_image %}
+                            <img src="{{ user_obj.profile_image.url }}" alt="{{ user_obj.username }}" 
+                                 class="rounded-circle img-thumbnail" style="width: 150px; height: 150px; object-fit: cover;">
+                        {% else %}
+                            <div class="rounded-circle bg-light d-flex align-items-center justify-content-center mx-auto" 
+                                 style="width: 150px; height: 150px; font-size: 4rem; color: #6c757d;">
+                                <i class="fas fa-user-circle"></i>
+                            </div>
+                        {% endif %}
+                        <h4 class="mt-3">{{ user_obj.get_full_name|default:user_obj.username }}</h4>
+                        <p class="text-muted mb-1">@{{ user_obj.username }}</p>
+                        
+                        <div class="d-flex justify-content-center mt-2">
+                            {% if user_obj.is_active %}
+                                <span class="badge bg-success me-2">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary me-2">Inactive</span>
+                            {% endif %}
+                            
+                            {% if user_obj.is_superuser %}
+                                <span class="badge bg-danger me-2">Superuser</span>
+                            {% elif user_obj.is_staff %}
+                                <span class="badge bg-warning text-dark me-2">Staff</span>
+                            {% else %}
+                                <span class="badge bg-info me-2">Regular User</span>
+                            {% endif %}
+                            
+                            {% if user_obj.groups.all %}
+                                {% for group in user_obj.groups.all %}
+                                    <span class="badge bg-primary me-1">{{ group.name }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <dl class="row">
+                        <dt class="col-sm-4">First Name:</dt>
+                        <dd class="col-sm-8">{{ user_obj.first_name|default:"Not provided" }}</dd>
+                        
+                        <dt class="col-sm-4">Last Name:</dt>
+                        <dd class="col-sm-8">{{ user_obj.last_name|default:"Not provided" }}</dd>
+                        
+                        <dt class="col-sm-4">Email:</dt>
+                        <dd class="col-sm-8">
+                            {% if user_obj.email %}
+                                <a href="mailto:{{ user_obj.email }}">{{ user_obj.email }}</a>
+                            {% else %}
+                                Not provided
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Date Joined:</dt>
+                        <dd class="col-sm-8">{{ user_obj.date_joined|date:"F j, Y" }}</dd>
+                        
+                        <dt class="col-sm-4">Last Login:</dt>
+                        <dd class="col-sm-8">
+                            {% if user_obj.last_login %}
+                                {{ user_obj.last_login|date:"F j, Y g:i A" }}
+                            {% else %}
+                                Never
+                            {% endif %}
+                        </dd>
+                    </dl>
+                    
+                    {% if user_obj.bio %}
+                        <hr>
+                        <h6>Bio</h6>
+                        <p>{{ user_obj.bio|linebreaks }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">League Associations</h5>
+                </div>
+                <div class="card-body">
+                    {% if user_leagues %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>League Name</th>
+                                        <th>Description</th>
+                                        <th>Teams</th>
+                                        <th>Founded</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for league in user_leagues %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'league_detail' league.id %}">{{ league.name }}</a>
+                                                {% if league.id in admin_league_ids %}
+                                                    <span class="badge bg-success ms-2">Admin</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ league.description|truncatechars:50 }}</td>
+                                            <td>{{ league.divisions.all|length }}</td>
+                                            <td>{{ league.founded_year|default:"-" }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <a href="{% url 'user_leagues' user_obj.id %}" class="btn btn-outline-info mt-3">
+                            <i class="fas fa-edit me-1"></i>Manage League Associations
+                        </a>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>This user is not associated with any leagues.
+                            <a href="{% url 'user_leagues' user_obj.id %}" class="alert-link">Add league associations</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Team Associations</h5>
+                </div>
+                <div class="card-body">
+                    {% if user_obj.teams.all %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Team Name</th>
+                                        <th>League</th>
+                                        <th>Division</th>
+                                        <th>Mascot</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for team in user_obj.teams.all %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'team_detail' team.id %}">{{ team.name }}</a>
+                                            </td>
+                                            <td>{{ team.division.league.name }}</td>
+                                            <td>{{ team.division.name }}</td>
+                                            <td>{{ team.mascot|default:"-" }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <a href="{% url 'user_teams' user_obj.id %}" class="btn btn-outline-success mt-3">
+                            <i class="fas fa-edit me-1"></i>Manage Team Associations
+                        </a>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>This user is not associated with any teams.
+                            {% if user_leagues %}
+                                <a href="{% url 'user_teams' user_obj.id %}" class="alert-link">Add team associations</a>
+                            {% else %}
+                                Associate this user with leagues first before adding team associations.
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">User Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-user-tag me-2"></i>Role Management</h5>
+                                    <p class="card-text">Manage user roles, permissions, and access levels.</p>
+                                    <a href="{% url 'user_roles' user_obj.id %}" class="btn btn-outline-primary">
+                                        Manage Roles
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title"><i class="fas fa-key me-2"></i>Reset Password</h5>
+                                    <p class="card-text">Reset user's password or force password change.</p>
+                                    <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">
+                                        Reset Password
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if user.is_superuser and not user_obj.is_superuser %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title"><i class="fas fa-ban me-2"></i>Account Status</h5>
+                                        <p class="card-text">
+                                            {% if user_obj.is_active %}
+                                                Deactivate user account to prevent login.
+                                            {% else %}
+                                                Reactivate user account to allow login.
+                                            {% endif %}
+                                        </p>
+                                        <button class="btn btn-{% if user_obj.is_active %}outline-danger{% else %}outline-success{% endif %}" 
+                                                data-bs-toggle="modal" data-bs-target="#statusModal">
+                                            {% if user_obj.is_active %}Deactivate Account{% else %}Activate Account{% endif %}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Password Reset Modal -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="resetPasswordModalLabel">Reset Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to reset the password for <strong>{{ user_obj.username }}</strong>?</p>
+                <p>This action will generate a new temporary password that the user will need to change on their next login.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" class="btn btn-warning">Reset Password</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Account Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header {% if user_obj.is_active %}bg-danger text-white{% else %}bg-success text-white{% endif %}">
+                <h5 class="modal-title" id="statusModalLabel">
+                    {% if user_obj.is_active %}Deactivate Account{% else %}Activate Account{% endif %}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to {% if user_obj.is_active %}deactivate{% else %}activate{% endif %} the account for <strong>{{ user_obj.username }}</strong>?</p>
+                
+                {% if user_obj.is_active %}
+                    <p>This action will prevent the user from logging in. The account will be preserved but inactive.</p>
+                {% else %}
+                    <p>This action will allow the user to log in again.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <a href="#" class="btn {% if user_obj.is_active %}btn-danger{% else %}btn-success{% endif %}">
+                    {% if user_obj.is_active %}Deactivate{% else %}Activate{% endif %} Account
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

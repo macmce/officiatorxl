@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage User Leagues - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-trophy me-2"></i>Manage League Associations
+        </h1>
+        <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back to User
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-link me-2"></i>League Associations for {{ user_obj.username }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>League associations determine which leagues a user has access to. Users can only view and manage content related to their associated leagues. You can also designate a user as a league admin, which gives them additional permissions within that league.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if leagues %}
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Select Leagues</label>
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 50px;">Associate</th>
+                                                <th>League Name</th>
+                                                <th>Description</th>
+                                                <th>Teams</th>
+                                                <th style="width: 100px;">League Admin</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for league in leagues %}
+                                                <tr>
+                                                    <td>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input league-checkbox" type="checkbox" 
+                                                                   name="leagues" value="{{ league.id }}" 
+                                                                   id="league-{{ league.id }}"
+                                                                   data-league-id="{{ league.id }}"
+                                                                   {% if league.id in user_league_ids %}checked{% endif %}>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <label for="league-{{ league.id }}" class="form-check-label fw-bold">
+                                                            {{ league.name }}
+                                                        </label>
+                                                    </td>
+                                                    <td>{{ league.description|truncatechars:50 }}</td>
+                                                    <td>{{ league.divisions.all|length }}</td>
+                                                    <td>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input admin-checkbox" type="checkbox" 
+                                                                   name="league_admin" value="{{ league.id }}" 
+                                                                   id="admin-{{ league.id }}"
+                                                                   {% if league.id in admin_league_ids %}checked{% endif %}
+                                                                   {% if league.id not in user_league_ids %}disabled{% endif %}>
+                                                            <label for="admin-{{ league.id }}" class="form-check-label">
+                                                                Admin
+                                                            </label>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mt-4">
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="selectAll">Select All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="deselectAll">Deselect All</button>
+                                    <button type="button" class="btn btn-sm btn-outline-success me-2" id="makeAllAdmins">Make All Admin</button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" id="clearAllAdmins">Clear All Admin</button>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Save League Associations & Admin Roles
+                                </button>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle me-2"></i>No leagues available in the system. Please create leagues first.
+                            </div>
+                            <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-primary">
+                                <i class="fas fa-arrow-left me-2"></i>Return to User Detail
+                            </a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle league checkbox changes to enable/disable admin checkbox
+        document.querySelectorAll('.league-checkbox').forEach(checkbox => {
+            // Initial setup
+            const leagueId = checkbox.dataset.leagueId;
+            const adminCheckbox = document.getElementById(`admin-${leagueId}`);
+            if (adminCheckbox) {
+                adminCheckbox.disabled = !checkbox.checked;
+                // If league is unchecked, uncheck admin too
+                if (!checkbox.checked) {
+                    adminCheckbox.checked = false;
+                }
+            }
+            
+            // Add change event listener
+            checkbox.addEventListener('change', function() {
+                const leagueId = this.dataset.leagueId;
+                const adminCheckbox = document.getElementById(`admin-${leagueId}`);
+                if (adminCheckbox) {
+                    adminCheckbox.disabled = !this.checked;
+                    // If league is unchecked, uncheck admin too
+                    if (!this.checked) {
+                        adminCheckbox.checked = false;
+                    }
+                }
+            });
+        });
+        
+        // Select all button - also enable all admin checkboxes
+        document.getElementById('selectAll').addEventListener('click', function() {
+            const leagueCheckboxes = document.querySelectorAll('.league-checkbox');
+            leagueCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                // Enable corresponding admin checkbox
+                const leagueId = checkbox.dataset.leagueId;
+                const adminCheckbox = document.getElementById(`admin-${leagueId}`);
+                if (adminCheckbox) {
+                    adminCheckbox.disabled = false;
+                }
+            });
+        });
+        
+        // Deselect all button - also disable and uncheck all admin checkboxes
+        document.getElementById('deselectAll').addEventListener('click', function() {
+            const leagueCheckboxes = document.querySelectorAll('.league-checkbox');
+            leagueCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                // Disable and uncheck corresponding admin checkbox
+                const leagueId = checkbox.dataset.leagueId;
+                const adminCheckbox = document.getElementById(`admin-${leagueId}`);
+                if (adminCheckbox) {
+                    adminCheckbox.disabled = true;
+                    adminCheckbox.checked = false;
+                }
+            });
+        });
+        
+        // Add a button to make all selected leagues admin
+        document.getElementById('makeAllAdmins').addEventListener('click', function() {
+            const leagueCheckboxes = document.querySelectorAll('.league-checkbox:checked');
+            leagueCheckboxes.forEach(checkbox => {
+                const leagueId = checkbox.dataset.leagueId;
+                const adminCheckbox = document.getElementById(`admin-${leagueId}`);
+                if (adminCheckbox && !adminCheckbox.disabled) {
+                    adminCheckbox.checked = true;
+                }
+            });
+        });
+        
+        // Add a button to clear all admin selections
+        document.getElementById('clearAllAdmins').addEventListener('click', function() {
+            const adminCheckboxes = document.querySelectorAll('.admin-checkbox');
+            adminCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

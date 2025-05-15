@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ meet.name }} - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-swimming-pool me-2"></i>{{ meet.name }}
+        </h1>
+        <div>
+            <a href="{% url 'meet_list' %}" class="btn btn-outline-secondary me-2">
+                <i class="fas fa-chevron-left me-1"></i>Back to Meets
+            </a>
+            <a href="{% url 'meet_update' meet.id %}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-edit me-1"></i>Edit
+            </a>
+            <a href="{% url 'meet_delete' meet.id %}" class="btn btn-outline-danger">
+                <i class="fas fa-trash-alt me-1"></i>Delete
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header {% if meet.date < today %}bg-secondary text-white{% elif meet.date == today %}bg-primary text-white{% else %}bg-info text-white{% endif %}">
+                    <h5 class="mb-0">Meet Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Name:</strong> {{ meet.name }}</p>
+                    <p><strong>Date:</strong> {{ meet.date|date:"l, F j, Y" }}</p>
+                    <p><strong>Meet Type:</strong> {{ meet.get_meet_type_display }}</p>
+                    <p><strong>Host Team:</strong> <a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a></p>
+                    <p><strong>League:</strong> <a href="{% url 'league_detail' meet.league.id %}">{{ meet.league.name }}</a></p>
+                    
+                    {% if meet.pool %}
+                        <p><strong>Pool:</strong> {{ meet.pool.name }} ({{ meet.pool.length }} {{ meet.pool.units }}, {{ meet.pool.lanes }} lanes)</p>
+                        {% if meet.pool.address %}
+                            <p><strong>Address:</strong> {{ meet.pool.address }}</p>
+                        {% endif %}
+                    {% else %}
+                        <p><strong>Pool:</strong> <span class="text-muted">Not specified</span></p>
+                    {% endif %}
+                    
+                    {% if meet.weather_forecast %}
+                        <div class="mt-3">
+                            <h6><i class="fas fa-cloud me-2"></i>Weather Forecast</h6>
+                            <div class="d-flex align-items-center">
+                                <div class="me-3">
+                                    <h4>{{ meet.weather_forecast.temperature }}°{{ meet.weather_forecast.units|default:'F' }}</h4>
+                                    <p>{{ meet.weather_forecast.description }}</p>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <ul class="list-group list-group-sm">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Precipitation
+                                            <span class="badge bg-primary">{{ meet.weather_forecast.precipitation }}%</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    <p><strong>Officials Assigned:</strong> {{ assignments.count }}</p>
+                    
+                    <p><strong>Participating Teams:</strong></p>
+                    {% if meet.participating_teams.all %}
+                    <ul class="list-group mb-3">
+                        {% for team in meet.participating_teams.all %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="{% url 'team_detail' team.id %}">{{ team.name }}</a>
+                                {% if team == meet.host_team %}
+                                    <span class="badge bg-primary">Host</span>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                        <p class="text-muted">No participating teams added yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Assignments</h5>
+                    <a href="{% url 'assignment_create' %}?meet={{ meet.id }}" class="btn btn-sm btn-light">
+                        <i class="fas fa-plus me-1"></i>Add Assignment
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if assignments %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Official</th>
+                                        <th>Position</th>
+                                        <th>Team</th>
+                                        <th>Certification</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for assignment in assignments %}
+                                        <tr>
+                                            <td><a href="{% url 'official_detail' assignment.official.id %}">{{ assignment.official.name }}</a></td>
+                                            <td>{{ assignment.role }}</td>
+                                            <td>{{ assignment.official.team.name }}</td>
+                                            <td>{% if assignment.official.certification %}{{ assignment.official.certification.name }}{% else %}<span class="text-muted">None</span>{% endif %}</td>
+                                            <td>
+                                                {% if assignment.status == 'confirmed' %}
+                                                    <span class="badge bg-success">Confirmed</span>
+                                                {% elif assignment.status == 'tentative' %}
+                                                    <span class="badge bg-warning text-dark">Tentative</span>
+                                                {% elif assignment.status == 'declined' %}
+                                                    <span class="badge bg-danger">Declined</span>
+                                                {% elif assignment.status == 'pending' %}
+                                                    <span class="badge bg-secondary">Pending</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <a href="{% url 'assignment_detail' assignment.id %}" class="btn btn-outline-primary">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="{% url 'assignment_update' assignment.id %}" class="btn btn-outline-secondary">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                    <a href="{% url 'assignment_delete' assignment.id %}" class="btn btn-outline-danger">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>No officials assigned to this meet.
+                            <a href="{% url 'assignment_create' %}?meet={{ meet.id }}" class="alert-link">Add your first assignment</a> to get started.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if available_officials %}
+                <div class="card mt-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Available Officials</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Team</th>
+                                        <th>Certification</th>
+                                        <th>Experience</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for official in available_officials %}
+                                        <tr>
+                                            <td>{{ official.name }}</td>
+                                            <td>{% if official.team %}{{ official.team.name }}{% else %}<span class="text-muted">None</span>{% endif %}</td>
+                                            <td>{% if official.certification %}{{ official.certification.name }}{% else %}<span class="text-muted">None</span>{% endif %}</td>
+                                            <td>{{ official.years_experience }} years</td>
+                                            <td>
+                                                <a href="{% url 'assignment_create' %}?meet={{ meet.id }}&official={{ official.id }}" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-plus me-1"></i>Assign
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

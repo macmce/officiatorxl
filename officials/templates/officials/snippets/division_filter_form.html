@@ -1,0 +1,47 @@
+{% load crispy_forms_tags %}
+
+<div class="card mb-4" style="background-color: var(--apple-light-gray);">
+    <div class="card-header" style="background-color: var(--apple-light-gray); border-bottom: 1px solid rgba(0,0,0,0.1);">
+        <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter Divisions</h5>
+    </div>
+    <div class="card-body pt-3">
+        <form method="GET" action="." class="row g-3">
+            <div class="col-md-3">
+                {{ filter.form.name|as_crispy_field }}
+            </div>
+            <div class="col-md-3">
+                {{ filter.form.description|as_crispy_field }}
+            </div>
+            <div class="col-md-3">
+                {{ filter.form.league|as_crispy_field }}
+            </div>
+            <div class="col-md-3">
+                {{ filter.form.has_teams|as_crispy_field }}
+            </div>
+            <div class="col-md-12 d-flex align-items-end justify-content-end">
+                {% if filter.form.is_bound and filter.form.changed_data %}
+                <div class="col-md-2 me-2">
+                    <a href="{% url 'division_list' %}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </a>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if filter.form.is_bound and filter.form.changed_data %}
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-funnel-fill"></i> Showing filtered results. 
+        {% if filter.form.name.value %}Name: <strong>{{ filter.form.name.value }}</strong>{% endif %}
+        {% if filter.form.description.value %}Description: <strong>{{ filter.form.description.value }}</strong>{% endif %}
+        {% if filter.form.league.value %}League: <strong>{{ filter.form.league.value.name }}</strong>{% endif %}
+        {% if filter.form.has_teams.value %}Has Teams: <strong>Yes</strong>{% endif %}
+    </div>
+{% endif %}

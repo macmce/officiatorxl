@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ event.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h1 class="mb-0">{{ event.name }}</h1>
+        </div>
+        <div class="card-body">
+            <p><strong>Description:</strong> {{ event.description|default:"N/A" }}</p>
+            <p><strong>Meet Type:</strong> <span class="badge bg-info">{{ event.get_meet_type_display }}</span></p>
+            <p><strong>Duration:</strong> {{ event.duration_minutes }} minutes</p>
+            <p><strong>Participant Count:</strong> {{ event.participant_count }}</p>
+            <p><strong>Officials Required:</strong> {{ event.officials_required }}</p>
+            <p><strong>Created At:</strong> {{ event.created_at|date:"Y-m-d H:i" }}</p>
+            <p><strong>Updated At:</strong> {{ event.updated_at|date:"Y-m-d H:i" }}</p>
+        </div>
+        <div class="card-footer text-end">
+            <a href="{% url 'event-list' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left-circle"></i> Back to List
+            </a>
+            <a href="{% url 'event-update' event.pk %}" class="btn btn-warning ms-2">
+                <i class="bi bi-pencil-square"></i> Edit
+            </a>
+            <a href="{% url 'event-delete' event.pk %}" class="btn btn-danger ms-2">
+                <i class="bi bi-trash"></i> Delete
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

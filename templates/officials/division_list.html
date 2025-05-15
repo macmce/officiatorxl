@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Divisions - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2"><i class="bi bi-diagram-3 me-2"></i>Divisions</h1>
+        <div class="d-flex align-items-center">
+            <div class="btn-group me-3" role="group" aria-label="View toggle">
+                <button type="button" class="btn btn-outline-secondary" id="card-view-btn">
+                    <i class="bi bi-grid me-1"></i> Cards
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="list-view-btn">
+                    <i class="bi bi-list-ul me-1"></i> List
+                </button>
+            </div>
+            <a href="{% url 'division_create' %}" class="btn" style="background-color: var(--apple-green); color: white;">
+                <i class="bi bi-plus-lg me-2"></i>Create Division
+            </a>
+        </div>
+    </div>
+
+    {% include 'officials/snippets/division_filter_form.html' %}
+
+    {% if page_obj and page_obj.object_list %}
+        <!-- Card View -->
+        <div class="row" id="card-view">
+            {% for division in page_obj.object_list %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header text-white" style="background-color: var(--apple-blue);">
+                            <h5 class="mb-0">{{ division.name }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">{{ division.description|truncatechars:150 }}</p>
+                            <p class="text-muted"><strong>League:</strong> {{ division.league.name }}</p>
+                            <p class="text-muted"><strong>Teams:</strong> {{ division.teams.count }}</p>
+                        </div>
+                        <div class="card-footer">
+                            <div class="btn-group w-100" role="group">
+                                <a href="{% url 'division_detail' division.id %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i>View
+                                </a>
+                                <a href="{% url 'division_update' division.id %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-pencil me-1"></i>Edit
+                                </a>
+                                <a href="{% url 'division_delete' division.id %}" class="btn btn-outline-danger">
+                                    <i class="bi bi-trash me-1"></i>Delete
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- List View -->
+        <div id="list-view" class="d-none">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>League</th>
+                                    <th>Teams</th>
+                                    <th>Description</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for division in page_obj.object_list %}
+                                    <tr>
+                                        <td class="align-middle">{{ division.name }}</td>
+                                        <td class="align-middle">{{ division.league.name }}</td>
+                                        <td class="align-middle">{{ division.teams.count }}</td>
+                                        <td class="align-middle">{{ division.description|truncatechars:100 }}</td>
+                                        <td class="align-middle">
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'division_detail' division.id %}" class="btn btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                <a href="{% url 'division_update' division.id %}" class="btn btn-outline-secondary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page=1" aria-label="First">
+                                <span aria-hidden="true">&laquo;&laquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">&laquo;&laquo;</span>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link">&laquo;</span>
+                        </li>
+                    {% endif %}
+
+                    {% for i in page_obj.paginator.page_range %}
+                        {% if page_obj.number == i %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ i }}</span>
+                            </li>
+                        {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ i }}">{{ i }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}" aria-label="Last">
+                                <span aria-hidden="true">&raquo;&raquo;</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">&raquo;</span>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link">&raquo;&raquo;</span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>No divisions found. 
+            <a href="{% url 'division_create' %}" class="alert-link">Create your first division</a> to get started.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const cardViewBtn = document.getElementById('card-view-btn');
+        const listViewBtn = document.getElementById('list-view-btn');
+        const cardView = document.getElementById('card-view');
+        const listView = document.getElementById('list-view');
+        
+        // Check if there's a saved preference
+        const savedView = localStorage.getItem('divisionViewPreference');
+        
+        // Explicitly set card view as default if no preference is saved
+        if (!savedView || savedView === 'card') {
+            showCardView();
+        } else if (savedView === 'list') {
+            showListView();
+        }
+        
+        // Ensure card view is the default by setting it in localStorage if not already set
+        if (!localStorage.getItem('divisionViewPreference')) {
+            localStorage.setItem('divisionViewPreference', 'card');
+        }
+        
+        // Add event listeners
+        cardViewBtn.addEventListener('click', showCardView);
+        listViewBtn.addEventListener('click', showListView);
+        
+        function showCardView() {
+            cardView.classList.remove('d-none');
+            listView.classList.add('d-none');
+            cardViewBtn.classList.add('active', 'btn-secondary');
+            cardViewBtn.classList.remove('btn-outline-secondary');
+            listViewBtn.classList.remove('active', 'btn-secondary');
+            listViewBtn.classList.add('btn-outline-secondary');
+            localStorage.setItem('divisionViewPreference', 'card');
+        }
+        
+        function showListView() {
+            cardView.classList.add('d-none');
+            listView.classList.remove('d-none');
+            listViewBtn.classList.add('active', 'btn-secondary');
+            listViewBtn.classList.remove('btn-outline-secondary');
+            cardViewBtn.classList.remove('active', 'btn-secondary');
+            cardViewBtn.classList.add('btn-outline-secondary');
+            localStorage.setItem('divisionViewPreference', 'list');
+        }
+    });
+</script>
+{% endblock %}

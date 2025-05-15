@@ -1,0 +1,51 @@
+{% load crispy_forms_tags %}
+
+<div class="card mb-4" style="background-color: var(--apple-light-gray);">
+    <div class="card-header" style="background-color: var(--apple-light-gray); border-bottom: 1px solid rgba(0,0,0,0.1);">
+        <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter Certifications</h5>
+    </div>
+    <div class="card-body pt-3">
+        <form method="GET" action="." class="row g-3">
+            <div class="col-md-6">
+                {{ filter.form.name|as_crispy_field }}
+            </div>
+            <div class="col-md-6">
+                {{ filter.form.abbreviation|as_crispy_field }}
+            </div>
+            <div class="col-md-4">
+                {{ filter.form.level|as_crispy_field }}
+            </div>
+            <div class="col-md-4">
+                {{ filter.form.level_min|as_crispy_field }}
+            </div>
+            <div class="col-md-4">
+                {{ filter.form.level_max|as_crispy_field }}
+            </div>
+            <div class="col-md-12 d-flex align-items-end justify-content-end">
+                {% if filters_active %}
+                <div class="col-md-2 me-2">
+                    <a href="{% url 'certification_list' %}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </a>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if filters_active %}
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-funnel-fill"></i> Showing filtered results. 
+        {% if filter.form.name.value %}Name: <strong>{{ filter.form.name.value }}</strong>{% endif %}
+        {% if filter.form.abbreviation.value %}Abbreviation: <strong>{{ filter.form.abbreviation.value }}</strong>{% endif %}
+        {% if filter.form.level.value %}Level: <strong>{{ filter.form.level.value }}</strong>{% endif %}
+        {% if filter.form.level_min.value %}Min level: <strong>{{ filter.form.level_min.value }}</strong>{% endif %}
+        {% if filter.form.level_max.value %}Max level: <strong>{{ filter.form.level_max.value }}</strong>{% endif %}
+    </div>
+{% endif %}

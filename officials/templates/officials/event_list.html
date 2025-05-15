@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Events{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2"><i class="bi bi-calendar-event me-2"></i>Events</h1>
+        <div class="d-flex">
+            <div class="btn-group me-2" role="group" aria-label="View toggle">
+                <button id="card-view-btn" type="button" class="btn btn-outline-secondary">
+                    <i class="bi bi-grid me-1"></i>Cards
+                </button>
+                <button id="list-view-btn" type="button" class="btn btn-outline-secondary">
+                    <i class="bi bi-list-ul me-1"></i>List
+                </button>
+            </div>
+            <a href="{% url 'event-create' %}" class="btn" style="background-color: var(--apple-green); color: white;">
+                <i class="bi bi-plus-circle"></i> Create Event
+            </a>
+            <a href="{% url 'event-import' %}" class="btn ms-2" style="background-color: var(--apple-yellow); color: black;">
+                <i class="bi bi-upload"></i> Import Events
+            </a>
+        </div>
+    </div>
+
+    {% include 'officials/snippets/event_filter_form.html' %}
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if events %}
+        <form method="post" action="{% url 'event-delete-selected' %}" id="event-form">
+            {% csrf_token %}
+            <div class="mb-3">
+                <button type="submit" class="btn btn-danger" id="delete-selected-btn" disabled>
+                    <i class="bi bi-trash"></i> Delete Selected
+                </button>
+                <span id="selected-count" class="ms-2 text-muted">0 events selected</span>
+            </div>
+            
+            <!-- Card View -->
+            <div id="card-view">
+                <div class="row">
+                    {% for event in events %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-header d-flex justify-content-between align-items-center text-white" style="background-color: var(--apple-blue);">
+                                <h5 class="mb-0">{{ event.event_number }}. {{ event.name }}</h5>
+                                <div class="form-check">
+                                    <input type="checkbox" name="selected_events" value="{{ event.id }}" class="form-check-input event-checkbox">
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">
+                                    {% if event.description %}
+                                    <strong>Description:</strong> {{ event.description|truncatechars:100 }}<br>
+                                    {% endif %}
+                                    <strong>Meet Type:</strong> {{ event.get_meet_type_display }}<br>
+                                    <strong>Gender:</strong> {{ event.get_gender_display }}
+                                </p>
+                            </div>
+                            <div class="card-footer">
+                                <div class="btn-group w-100" role="group">
+                                    <a href="{% url 'event-detail' event.id %}" class="btn btn-outline-primary">
+                                        <i class="bi bi-eye me-1"></i>View
+                                    </a>
+                                    <a href="{% url 'event-update' event.id %}" class="btn btn-outline-secondary">
+                                        <i class="bi bi-pencil me-1"></i>Edit
+                                    </a>
+                                    <a href="{% url 'event-delete' event.id %}" class="btn btn-outline-danger">
+                                        <i class="bi bi-trash me-1"></i>Delete
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- List View -->
+            <div id="list-view" style="display: none;">
+                {% include 'officials/snippets/event_table.html' %}
+            </div>
+        </form>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No events found. 
+            {% if filters_active %}Try clearing the filters or {% endif %}add some events to get started.
+        </div>
+    {% endif %}
+
+        {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="page-item disabled">
+                        <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Last &raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const cardViewBtn = document.getElementById('card-view-btn');
+        const listViewBtn = document.getElementById('list-view-btn');
+        const cardView = document.getElementById('card-view');
+        const listView = document.getElementById('list-view');
+        
+        // Check if there's a saved preference
+        const savedView = localStorage.getItem('eventViewPreference');
+        
+        // Explicitly set card view as default if no preference is saved
+        if (!savedView || savedView === 'card') {
+            showCardView();
+        } else if (savedView === 'list') {
+            showListView();
+        }
+        
+        // Ensure card view is the default by setting it in localStorage if not already set
+        if (!localStorage.getItem('eventViewPreference')) {
+            localStorage.setItem('eventViewPreference', 'card');
+        }
+        
+        // Add event listeners
+        cardViewBtn.addEventListener('click', showCardView);
+        listViewBtn.addEventListener('click', showListView);
+        
+        function showCardView() {
+            // Show/hide content using style.display for better reliability
+            cardView.style.display = 'block';
+            listView.style.display = 'none';
+            
+            // Update button styling
+            cardViewBtn.classList.add('active', 'btn-secondary');
+            cardViewBtn.classList.remove('btn-outline-secondary');
+            listViewBtn.classList.remove('active', 'btn-secondary');
+            listViewBtn.classList.add('btn-outline-secondary');
+            localStorage.setItem('eventViewPreference', 'card');
+        }
+        
+        function showListView() {
+            // Show/hide content using style.display for better reliability
+            cardView.style.display = 'none';
+            listView.style.display = 'block';
+            
+            // Update button styling
+            listViewBtn.classList.add('active', 'btn-secondary');
+            listViewBtn.classList.remove('btn-outline-secondary');
+            cardViewBtn.classList.remove('active', 'btn-secondary');
+            cardViewBtn.classList.add('btn-outline-secondary');
+            localStorage.setItem('eventViewPreference', 'list');
+        }
+    });
+</script>
+{% endblock %}

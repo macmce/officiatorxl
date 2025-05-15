@@ -1,0 +1,80 @@
+{% load crispy_forms_tags %}
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-light">
+            <tr>
+                <th style="width: 30px;"><input type="checkbox" id="select-all" class="form-check-input"></th>
+                <th style="width: 80px;">Number</th>
+                <th>Name</th>
+                <th style="width: 120px;">Meet Type</th>
+                <th style="width: 100px;">Gender</th>
+                <th style="width: 120px;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event in events %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="selected_events" value="{{ event.id }}" class="form-check-input event-checkbox">
+                    </td>
+                    <td>{{ event.event_number }}</td>
+                    <td>
+                        <a href="{% url 'event-detail' event.id %}">{{ event.name }}</a>
+                        {% if event.description %}
+                            <span class="text-muted d-block small">{{ event.description|truncatechars:50 }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ event.get_meet_type_display }}</td>
+                    <td>{{ event.get_gender_display }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'event-update' event.id %}" class="btn btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{% url 'event-delete' event.id %}" class="btn btn-outline-danger">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle "select all" checkbox
+        const selectAllCheckbox = document.getElementById('select-all');
+        const eventCheckboxes = document.querySelectorAll('.event-checkbox');
+        const deleteBtn = document.getElementById('delete-selected-btn');
+        const selectedCountSpan = document.getElementById('selected-count');
+        
+        function updateSelectedCount() {
+            const checkedCount = document.querySelectorAll('.event-checkbox:checked').length;
+            selectedCountSpan.textContent = checkedCount + ' events selected';
+            deleteBtn.disabled = checkedCount === 0;
+        }
+        
+        selectAllCheckbox.addEventListener('change', function() {
+            eventCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updateSelectedCount();
+        });
+        
+        eventCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                updateSelectedCount();
+                
+                // Update "select all" checkbox state
+                const allChecked = document.querySelectorAll('.event-checkbox:not(:checked)').length === 0;
+                selectAllCheckbox.checked = allChecked;
+            });
+        });
+        
+        // Initialize count
+        updateSelectedCount();
+    });
+</script>

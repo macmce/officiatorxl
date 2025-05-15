@@ -1,0 +1,47 @@
+{% load crispy_forms_tags %}
+
+<div class="card mb-4" style="background-color: var(--apple-light-gray);">
+    <div class="card-header" style="background-color: var(--apple-light-gray); border-bottom: 1px solid rgba(0,0,0,0.1);">
+        <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filter Events</h5>
+    </div>
+    <div class="card-body pt-3">
+        <form method="GET" action="." class="row g-3">
+            <div class="col-md-3">
+                {{ filter.form.event_number|as_crispy_field }}
+            </div>
+            <div class="col-md-3">
+                {{ filter.form.name|as_crispy_field }}
+            </div>
+            <div class="col-md-3">
+                {{ filter.form.meet_type|as_crispy_field }}
+            </div>
+            <div class="col-md-3">
+                {{ filter.form.gender|as_crispy_field }}
+            </div>
+            <div class="col-md-12 d-flex align-items-end justify-content-end">
+                {% if filters_active %}
+                <div class="col-md-2 me-2">
+                    <a href="{% url 'event-list' %}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle me-1"></i>Clear
+                    </a>
+                </div>
+                {% endif %}
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-search me-1"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if filters_active %}
+    <div class="alert alert-info" role="alert">
+        <i class="bi bi-funnel-fill"></i> Showing filtered results. 
+        {% if filter.form.event_number.value %}Event Number: <strong>{{ filter.form.event_number.value }}</strong>{% endif %}
+        {% if filter.form.name.value %}Name: <strong>{{ filter.form.name.value }}</strong>{% endif %}
+        {% if filter.form.meet_type.value %}Meet Type: <strong>{{ filter.form.meet_type.value|upper }}</strong>{% endif %}
+        {% if filter.form.gender.value %}Gender: <strong>{{ filter.form.gender.value|title }}</strong>{% endif %}
+    </div>
+{% endif %}

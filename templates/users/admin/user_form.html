@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-user-edit me-2"></i>{{ title }}
+        </h1>
+        <a href="{% if user_obj %}{% url 'user_detail' user_obj.id %}{% else %}{% url 'user_list' %}{% endif %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back{% if user_obj %} to User{% else %} to Users{% endif %}
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">User Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                {% if form.username %}
+                                    {{ form.username|as_crispy_field }}
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {% if form.email %}
+                                    {{ form.email|as_crispy_field }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                {% if form.first_name %}
+                                    {{ form.first_name|as_crispy_field }}
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {% if form.last_name %}
+                                    {{ form.last_name|as_crispy_field }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        {% if form.bio %}
+                            {{ form.bio|as_crispy_field }}
+                        {% endif %}
+                        {% if form.profile_image %}
+                            {{ form.profile_image|as_crispy_field }}
+                        {% endif %}
+                        
+                        {% if form.password1 and form.password2 %}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.password1|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.password2|as_crispy_field }}
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        {% if form.is_active or form.is_staff %}
+                            <div class="row">
+                                {% if form.is_active %}
+                                    <div class="col-md-6">
+                                        {{ form.is_active|as_crispy_field }}
+                                    </div>
+                                {% endif %}
+                                {% if form.is_staff %}
+                                    <div class="col-md-6">
+                                        {{ form.is_staff|as_crispy_field }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save User
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

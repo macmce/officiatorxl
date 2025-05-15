@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete Position - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <h1 class="mt-4">Confirm Delete Position</h1>
+    <ol class="breadcrumb mb-4">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'position_list' %}">Positions</a></li>
+        <li class="breadcrumb-item active">Confirm Delete</li>
+    </ol>
+
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Confirm Deletion
+        </div>
+        <div class="card-body">
+            <p class="lead">
+                Are you sure you want to delete the position: 
+                <strong>"{{ object.role }}"</strong> under the strategy 
+                <strong>"{{ object.strategy.get_name_display }}"</strong>?
+            </p>
+            <p>This action cannot be undone.</p>
+            
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="fas fa-trash-alt me-1"></i> Yes, Delete Position
+                </button>
+                <a href="{% url 'position_list' %}" class="btn btn-secondary">
+                    <i class="fas fa-times me-1"></i> No, Cancel
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

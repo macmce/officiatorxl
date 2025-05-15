@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-swimming-pool me-2"></i>{{ title }}
+        </h1>
+        <a href="{% url 'meet_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back to Meets
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Meet Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="meetForm">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.league|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.date|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.host_team|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.pool|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3" id="weatherForecast" style="display: none;">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">Weather Forecast</h5>
+                            </div>
+                            <div class="card-body" id="weatherContent">
+                                <div class="text-center">
+                                    <div class="spinner-border text-info" role="status" id="weatherLoading" style="display: none;">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <div id="weatherData"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.meet_type|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <!-- The participating_teams field is a ManyToManyField and should be handled appropriately by the form -->
+                        {{ form.participating_teams|as_crispy_field }}
+                        
+                        <div class="card mb-3" id="nameSection">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Meet Name</h5>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="enableNameEditToggle">
+                                    <label class="form-check-label text-white" for="enableNameEditToggle">Edit manually</label>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="id_name">Name</label>
+                                    <input type="text" name="name" id="id_name" class="form-control" readonly>
+                                    <div class="form-text text-muted">Auto-generated from date, meet type, and team abbreviations</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-info text-white">
+                                <i class="fas fa-save me-2"></i>Save Meet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const poolSelect = document.getElementById('id_pool');
+        const dateInput = document.getElementById('id_date');
+        const hostTeamSelect = document.getElementById('id_host_team');
+        const meetTypeSelect = document.getElementById('id_meet_type');
+        const participatingTeamsSelect = document.getElementById('id_participating_teams');
+        const nameInput = document.getElementById('id_name');
+        const enableNameEditToggle = document.getElementById('enableNameEditToggle');
+        const weatherForecast = document.getElementById('weatherForecast');
+        const weatherData = document.getElementById('weatherData');
+        const weatherLoading = document.getElementById('weatherLoading');
+        
+        // Function to load pools for the selected host team
+        function loadPoolsForTeam() {
+            if (!hostTeamSelect.value) return;
+            
+            // Clear current options except the empty one
+            const emptyOption = poolSelect.options[0];
+            poolSelect.innerHTML = '';
+            poolSelect.appendChild(emptyOption);
+            
+            // Fetch pools for the selected team
+            fetch(`/officials/api/team/${hostTeamSelect.value}/pools/`)
+                .then(response => response.json())
+                .then(pools => {
+                    pools.forEach(pool => {
+                        const option = document.createElement('option');
+                        option.value = pool.id;
+                        option.textContent = pool.name;
+                        option.dataset.address = pool.address;
+                        poolSelect.appendChild(option);
+                    });
+                    
+                    // If we're editing and a pool is already selected, get its weather
+                    if (poolSelect.value) {
+                        getWeatherForecast();
+                    }
+                })
+                .catch(error => console.error('Error loading pools:', error));
+        }
+        
+        // Function to get weather forecast for the selected pool and date
+        function getWeatherForecast() {
+            const poolId = poolSelect.value;
+            const date = dateInput.value;
+            
+            if (!poolId || !date) {
+                weatherForecast.style.display = 'none';
+                return;
+            }
+            
+            // Get the address from the selected option
+            const selectedOption = poolSelect.options[poolSelect.selectedIndex];
+            const address = selectedOption ? selectedOption.dataset.address : '';
+            
+            if (!address) {
+                weatherData.innerHTML = '<div class="alert alert-warning">Pool has no address, weather forecast unavailable.</div>';
+                weatherForecast.style.display = 'block';
+                return;
+            }
+            
+            // Show loading indicator
+            weatherLoading.style.display = 'block';
+            weatherData.innerHTML = '';
+            weatherForecast.style.display = 'block';
+            
+            // Make API call to get weather forecast
+            fetch(`/officials/api/weather/?address=${encodeURIComponent(address)}&date=${date}`)
+                .then(response => response.json())
+                .then(data => {
+                    weatherLoading.style.display = 'none';
+                    
+                    if (data.error) {
+                        weatherData.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+                        return;
+                    }
+                    
+                    // Display the weather forecast
+                    let weatherHtml = `
+                        <div class="row">
+                            <div class="col-md-4 text-center">
+                                <h1>${data.temperature}°${data.units === 'imperial' ? 'F' : 'C'}</h1>
+                                <p class="lead">${data.description}</p>
+                            </div>
+                            <div class="col-md-8">
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Chance of Precipitation
+                                        <span class="badge bg-primary">${data.precipitation}%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Humidity
+                                        <span class="badge bg-secondary">${data.humidity}%</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Wind
+                                        <span class="badge bg-info">${data.wind} mph</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                    
+                    weatherData.innerHTML = weatherHtml;
+                    
+                    // Store the weather data in a hidden input to be saved with the form
+                    let weatherInput = document.getElementById('id_weather_forecast');
+                    if (!weatherInput) {
+                        weatherInput = document.createElement('input');
+                        weatherInput.type = 'hidden';
+                        weatherInput.id = 'id_weather_forecast';
+                        weatherInput.name = 'weather_forecast';
+                        document.getElementById('meetForm').appendChild(weatherInput);
+                    }
+                    weatherInput.value = JSON.stringify(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching weather:', error);
+                    weatherLoading.style.display = 'none';
+                    weatherData.innerHTML = '<div class="alert alert-danger">Error fetching weather forecast. Please try again later.</div>';
+                });
+        }
+        
+        // Event listeners
+        hostTeamSelect.addEventListener('change', loadPoolsForTeam);
+        poolSelect.addEventListener('change', getWeatherForecast);
+        dateInput.addEventListener('change', getWeatherForecast);
+        
+        // Handle name field toggle
+        enableNameEditToggle.addEventListener('change', function() {
+            nameInput.readOnly = !this.checked;
+            if (this.checked) {
+                nameInput.focus();
+            } else {
+                generateMeetName();
+            }
+        });
+        
+        // Function to generate meet name from other fields
+        function generateMeetName() {
+            if (enableNameEditToggle.checked) return;
+            
+            const date = dateInput.value;
+            const meetType = meetTypeSelect.options[meetTypeSelect.selectedIndex]?.text || '';
+            let teamsText = '';
+            
+            // Get host team abbreviation/name
+            const hostTeamId = hostTeamSelect.value;
+            if (hostTeamId) {
+                const hostTeamText = hostTeamSelect.options[hostTeamSelect.selectedIndex].text;
+                teamsText += getTeamAbbreviation(hostTeamText);
+            }
+            
+            // Get participating teams abbreviations/names
+            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
+            if (selectedTeams.length > 0) {
+                selectedTeams.forEach(option => {
+                    // Skip if it's the host team to avoid duplication
+                    if (option.value !== hostTeamId) {
+                        if (teamsText) teamsText += '-';
+                        teamsText += getTeamAbbreviation(option.text);
+                    }
+                });
+            }
+            
+            // Format date for display
+            let formattedDate = '';
+            if (date) {
+                const dateObj = new Date(date);
+                formattedDate = dateObj.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+            
+            // Combine everything for the meet name
+            let meetName = '';
+            if (formattedDate) meetName += formattedDate;
+            if (meetType) meetName += (meetName ? ' ' : '') + meetType;
+            if (teamsText) meetName += (meetName ? ' ' : '') + teamsText;
+            
+            nameInput.value = meetName;
+        }
+        
+        // Extract abbreviation or short name from team name
+        function getTeamAbbreviation(teamName) {
+            // Check if there's an abbreviation in parentheses
+            const abbMatch = teamName.match(/\((\w+)\)$/);
+            if (abbMatch && abbMatch[1]) {
+                return abbMatch[1];
+            }
+            
+            // Otherwise use first 3 chars or entire name if shorter
+            return teamName.replace(/\s+.*$/, '').substring(0, 3);
+        }
+        
+        // Event listeners for generating meet name
+        dateInput.addEventListener('change', generateMeetName);
+        meetTypeSelect.addEventListener('change', generateMeetName);
+        hostTeamSelect.addEventListener('change', function() {
+            loadPoolsForTeam();
+            generateMeetName();
+        });
+        participatingTeamsSelect.addEventListener('change', generateMeetName);
+        
+        // Initial load if we're editing a meet
+        if (hostTeamSelect.value) {
+            loadPoolsForTeam();
+        }
+        
+        // Generate initial name
+        generateMeetName();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+
+{% block title %}Leagues - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2"><i class="bi bi-trophy me-2"></i>Leagues</h1>
+        <div class="d-flex align-items-center">
+            <div class="btn-group me-3" role="group" aria-label="View toggle">
+                <button type="button" class="btn btn-outline-secondary" id="card-view-btn">
+                    <i class="bi bi-grid me-1"></i> Cards
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="list-view-btn">
+                    <i class="bi bi-list-ul me-1"></i> List
+                </button>
+            </div>
+            {% if user.is_superuser %}
+            <a href="{% url 'league_create' %}" class="btn" style="background-color: var(--apple-green); color: white;">
+                <i class="bi bi-plus-lg me-2"></i>Create League
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% include 'officials/snippets/league_filter_form.html' %}
+
+    {% if leagues %}
+        <!-- Card View -->
+        <div id="card-view" class="row">
+            {% for league in leagues %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header text-white" style="background-color: var(--apple-blue);">
+                            <h5 class="mb-0">{{ league.name }}</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if league.logo %}
+                                <div class="text-center mb-3">
+                                    <img src="{{ league.logo.url }}" alt="{{ league.name }} Logo" class="img-fluid" style="max-height: 100px;">
+                                </div>
+                            {% endif %}
+                            <p class="card-text">{{ league.description|truncatechars:150 }}</p>
+                            {% if league.founded_year %}
+                                <p class="text-muted"><strong>Founded:</strong> {{ league.founded_year }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer">
+                            <div class="btn-group w-100" role="group">
+                                <a href="{% url 'league_detail' league.id %}" class="btn btn-outline-primary">
+                                    <i class="bi bi-eye me-1"></i>View
+                                </a>
+                                {% if user.is_superuser %}
+                                <a href="{% url 'league_update' league.id %}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-pencil me-1"></i>Edit
+                                </a>
+                                <a href="{% url 'league_delete' league.id %}" class="btn btn-outline-danger">
+                                    <i class="bi bi-trash me-1"></i>Delete
+                                </a>
+                                {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- List View -->
+        <div id="list-view" style="display: none;">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    <th>Founded</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for league in page_obj %}
+                                    <tr>
+                                        <td class="align-middle">
+                                            <div class="d-flex align-items-center">
+                                                {% if league.logo %}
+                                                    <img src="{{ league.logo.url }}" alt="{{ league.name }} Logo" class="me-2" style="max-height: 30px; max-width: 30px;">
+                                                {% endif %}
+                                                <span>{{ league.name }}</span>
+                                            </div>
+                                        </td>
+                                        <td class="align-middle">{{ league.description|truncatechars:100 }}</td>
+                                        <td class="align-middle">{{ league.founded_year|default:"-" }}</td>
+                                        <td class="align-middle">
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{% url 'league_detail' league.id %}" class="btn btn-outline-primary">
+                                                    <i class="bi bi-eye"></i>
+                                                </a>
+                                                {% if user.is_superuser %}
+                                                    <a href="{% url 'league_update' league.id %}" class="btn btn-outline-secondary">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" aria-label="First">
+                                <span aria-hidden="true">&laquo;&laquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="page-item active">
+                                <a class="page-link" href="#">{{ num }}</a>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" aria-label="Next">
+                                <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}" aria-label="Last">
+                                <span aria-hidden="true">&raquo;&raquo;</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        {% endif %}
+    {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>No leagues found. 
+            {% if user.is_staff %}
+                <a href="{% url 'league_create' %}" class="alert-link">Create your first league</a> to get started.
+            {% else %}
+                Contact an administrator to be assigned to a league.
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get DOM elements
+        const cardViewBtn = document.getElementById('card-view-btn');
+        const listViewBtn = document.getElementById('list-view-btn');
+        const cardView = document.getElementById('card-view');
+        const listView = document.getElementById('list-view');
+        
+        // Ensure all elements exist before proceeding
+        if (!cardViewBtn || !listViewBtn || !cardView || !listView) {
+            console.error('Toggle view elements not found');
+            return;
+        }
+        
+        // Check if there's a saved preference
+        const savedView = localStorage.getItem('leagueViewPreference');
+        
+        function showCardView() {
+            cardView.style.display = 'block';
+            listView.style.display = 'none';
+            
+            // Update button styling
+            cardViewBtn.classList.add('active', 'btn-secondary');
+            cardViewBtn.classList.remove('btn-outline-secondary');
+            listViewBtn.classList.remove('active', 'btn-secondary');
+            listViewBtn.classList.add('btn-outline-secondary');
+        }
+        
+        // Apply list view styling and visibility
+        function applyListView() {
+            // Show/hide content
+            cardView.style.display = 'none';
+            listView.style.display = '';
+            
+            // Update button styling
+            listViewBtn.classList.add('active', 'btn-secondary');
+            listViewBtn.classList.remove('btn-outline-secondary');
+            cardViewBtn.classList.remove('active', 'btn-secondary');
+            cardViewBtn.classList.add('btn-outline-secondary');
+        }
+    });
+</script>
+{% endblock %}

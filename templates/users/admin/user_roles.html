@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}Manage User Roles - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-user-tag me-2"></i>Manage User Roles
+        </h1>
+        <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back to User
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shield-alt me-2"></i>Roles and Permissions for {{ user_obj.username }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>User roles determine what actions a user can perform in the system. Staff members can access the admin panel, while superusers have full system access.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                {{ form.is_active|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.is_staff|as_crispy_field }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.is_superuser|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <h5 class="mb-3">Group Memberships</h5>
+                        <p class="text-muted mb-3">Select which groups this user belongs to:</p>
+                        {{ form.groups|as_crispy_field }}
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Save Role Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer bg-light">
+                    <div class="d-flex align-items-center">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>Note: Group permissions are managed in the Django admin panel
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-question-circle me-2"></i>Understanding User Roles
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-user me-2"></i>Regular User
+                                    </h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success me-2"></i>Access user dashboard</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>View meets and assignments</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Manage personal profile</li>
+                                        <li><i class="fas fa-times text-danger me-2"></i>No admin access</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-user-tie me-2"></i>Staff Member
+                                    </h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success me-2"></i>All regular user abilities</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Access admin panel</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Manage content based on group permissions</li>
+                                        <li><i class="fas fa-times text-danger me-2"></i>Limited by group permissions</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        <i class="fas fa-user-shield me-2"></i>Superuser
+                                    </h5>
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success me-2"></i>All staff member abilities</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Full system access</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Manage user roles and permissions</li>
+                                        <li><i class="fas fa-check text-success me-2"></i>Override all restrictions</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

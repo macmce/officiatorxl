@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete All Events{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+            <h1 class="mb-0">Confirm Delete All Events</h1>
+        </div>
+        <div class="card-body">
+            <p class="lead">Are you sure you want to delete <strong>ALL</strong> events?</p>
+            <p class="text-danger fw-bold">This action is irreversible and will permanently remove all event data from the system.</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                    <i class="bi bi-trash-fill"></i> Yes, Delete All Events
+                </button>
+                <a href="{% url 'event-list' %}" class="btn btn-secondary ms-2">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

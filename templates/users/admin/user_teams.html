@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block title %}Manage User Teams - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-users me-2"></i>Manage Team Associations
+        </h1>
+        <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back to User
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-link me-2"></i>Team Associations for {{ user_obj.username }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="fas fa-info-circle me-2"></i>Team associations allow users to access specific teams within their associated leagues. Users can only be associated with teams from leagues they're already associated with.
+                    </div>
+                    
+                    {% if not user_obj.leagues.exists %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>This user is not associated with any leagues yet. Please <a href="{% url 'user_leagues' user_obj.id %}" class="alert-link">associate the user with leagues first</a> before managing team associations.
+                        </div>
+                    {% elif league_teams %}
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            {% for league, teams in league_teams.items %}
+                                <div class="card mb-4">
+                                    <div class="card-header bg-light">
+                                        <h5 class="mb-0">{{ league.name }}</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        {% if teams %}
+                                            <div class="table-responsive">
+                                                <table class="table table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 50px;"></th>
+                                                            <th>Team Name</th>
+                                                            <th>Abbreviation</th>
+                                                            <th>Division</th>
+                                                            <th>Mascot</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for team in teams %}
+                                                            <tr>
+                                                                <td>
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input team-checkbox" 
+                                                                               type="checkbox" 
+                                                                               name="teams" 
+                                                                               value="{{ team.id }}" 
+                                                                               id="team-{{ team.id }}"
+                                                                               data-league="{{ league.id }}"
+                                                                               {% if team.id in user_team_ids %}checked{% endif %}>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <label for="team-{{ team.id }}" class="form-check-label fw-bold">
+                                                                        {{ team.name }}
+                                                                    </label>
+                                                                </td>
+                                                                <td>{{ team.abbreviation|default:"-" }}</td>
+                                                                <td>{{ team.division.name }}</td>
+                                                                <td>{{ team.mascot|default:"-" }}</td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                            <div class="mt-2">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary select-all-league" data-league="{{ league.id }}">
+                                                    Select All in {{ league.name }}
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary deselect-all-league" data-league="{{ league.id }}">
+                                                    Deselect All in {{ league.name }}
+                                                </button>
+                                            </div>
+                                        {% else %}
+                                            <div class="alert alert-warning">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>No teams available in this league.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                            
+                            <div class="d-flex justify-content-between align-items-center mt-4">
+                                <div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="selectAllTeams">Select All Teams</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="deselectAllTeams">Deselect All Teams</button>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Save Team Associations
+                                </button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>No teams available for the user's associated leagues.
+                        </div>
+                        <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left me-2"></i>Return to User Detail
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Select all teams button
+        document.getElementById('selectAllTeams')?.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.team-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+            });
+        });
+        
+        // Deselect all teams button
+        document.getElementById('deselectAllTeams')?.addEventListener('click', function() {
+            const checkboxes = document.querySelectorAll('.team-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+        });
+        
+        // Select all teams within a specific league
+        document.querySelectorAll('.select-all-league').forEach(button => {
+            button.addEventListener('click', function() {
+                const leagueId = this.dataset.league;
+                const checkboxes = document.querySelectorAll(`.team-checkbox[data-league="${leagueId}"]`);
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                });
+            });
+        });
+        
+        // Deselect all teams within a specific league
+        document.querySelectorAll('.deselect-all-league').forEach(button => {
+            button.addEventListener('click', function() {
+                const leagueId = this.dataset.league;
+                const checkboxes = document.querySelectorAll(`.team-checkbox[data-league="${leagueId}"]`);
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

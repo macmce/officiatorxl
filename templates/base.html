@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}OfficatorXL - Swim Meet Officials Scheduler{% endblock %}</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --apple-blue: #0066CC; /* Apple's blue */
+            --apple-dark-blue: #147CE5; /* Apple's darker blue */
+            --apple-gray: #86868B; /* Apple's light gray text */
+            --apple-light-gray: #F5F5F7; /* Apple's light gray background */
+            --apple-dark-gray: #1D1D1F; /* Apple's dark gray/almost black */
+            --apple-red: #E30000; /* Apple's accent red */
+            --apple-green: #008000; /* Apple's accent green */
+            --apple-yellow: #FFCC00; /* Apple's accent yellow */
+            --apple-purple: #5856D6;
+            --apple-light-purple: #AF52DE;
+        }
+        
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            color: var(--apple-dark-gray);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        .navbar-custom {
+            background-color: rgba(0, 0, 0, 0.8); /* Apple's semi-transparent navbar */
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+        }
+        
+        .sidebar {
+            min-height: calc(100vh - 56px);
+            background-color: var(--apple-light-gray);
+            color: var(--apple-dark-gray);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .sidebar .nav-link {
+            color: var(--apple-dark-gray);
+            font-weight: 400;
+            transition: all 0.3s;
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        .sidebar .nav-link:hover {
+            color: var(--apple-blue);
+            background-color: transparent;
+        }
+        
+        .sidebar .nav-link.active {
+            color: var(--apple-blue);
+            background-color: transparent;
+            font-weight: 500;
+        }
+        
+        .content {
+            flex: 1;
+        }
+        
+        .card {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .card-header {
+            background-color: #fff;
+            border-bottom: none;
+            padding: 1.25rem 1.5rem;
+            font-weight: 500;
+        }
+        
+        .footer {
+            background-color: var(--apple-light-gray);
+            color: var(--apple-gray);
+            padding: 1.5rem 0;
+            margin-top: auto;
+            font-size: 0.85rem;
+        }
+        
+        /* Apple-style buttons */
+        .btn-primary {
+            background-color: var(--apple-blue);
+            border-color: var(--apple-blue);
+            border-radius: 20px;
+            padding: 0.5rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--apple-dark-blue);
+            border-color: var(--apple-dark-blue);
+        }
+        
+        .btn-outline-primary {
+            color: var(--apple-blue);
+            border-color: var(--apple-blue);
+            border-radius: 20px;
+            padding: 0.5rem 1.25rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--apple-blue);
+            border-color: var(--apple-blue);
+        }
+        
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .nav-link {
+            font-size: 0.9rem;
+        }
+        
+        /* Table styling */
+        .table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table thead th {
+            border-top: none;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            font-weight: 500;
+            color: var(--apple-gray);
+        }
+        
+        .table tbody td {
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            padding: 0.75rem 1rem;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-white sticky-top" style="border-bottom: 1px solid rgba(0,0,0,0.1);">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{% url 'home' %}" style="font-size: 1.4rem; letter-spacing: -0.01em;">
+                <i class="fas fa-swimming-pool me-2" style="color: var(--apple-blue);"></i>OfficatorXL
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav mx-auto">
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link px-3 {% if request.path == '/users/dashboard/' %}fw-medium{% endif %}" href="{% url 'dashboard' %}">
+                                Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link px-3 {% if '/leagues/' in request.path %}fw-medium{% endif %}" href="{% url 'league_list' %}">
+                                Leagues
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link px-3 {% if '/officials/' in request.path %}fw-medium{% endif %}" href="{% url 'official_list' %}">
+                                Officials
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link px-3 {% if '/meets/' in request.path %}fw-medium{% endif %}" href="{% url 'meet_list' %}">
+                                Meets
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link px-3 {% if '/events/' in request.path %}fw-medium{% endif %}" href="{% url 'event-list' %}">
+                                Events
+                            </a>
+                        </li>
+
+                    {% endif %}
+                </ul>
+                
+                <div class="d-flex align-items-center">
+                    {% if user.is_authenticated %}
+                        <div class="dropdown">
+                            <a class="btn btn-sm btn-outline-secondary rounded-pill dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user-circle me-1"></i> {{ user.username }}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" style="border-radius: 10px;">
+                                <li><a class="dropdown-item py-2" href="{% url 'profile' %}"><i class="fas fa-id-card me-2 text-muted"></i>Profile</a></li>
+                                {% if user.is_staff %}
+                                    <li><a class="dropdown-item py-2" href="{% url 'admin:index' %}"><i class="fas fa-cogs me-2 text-muted"></i>Admin</a></li>
+                                    <li><a class="dropdown-item py-2" href="{% url 'user_list' %}"><i class="fas fa-users-cog me-2 text-muted"></i>User Administration</a></li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item py-2" href="{% url 'logout' %}"><i class="fas fa-sign-out-alt me-2 text-muted"></i>Logout</a></li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="btn btn-sm btn-outline-secondary rounded-pill me-2">Log in</a>
+                        <a href="{% url 'signup' %}" class="btn btn-sm btn-primary rounded-pill">Sign up</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            {% if user.is_authenticated %}
+                <!-- Sidebar -->
+                <nav class="col-md-3 col-lg-2 d-md-block sidebar collapse">
+                    <div class="position-sticky pt-4">
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.path == '/users/dashboard/' %}active{% endif %}" href="{% url 'dashboard' %}">
+                                    <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/leagues/' in request.path %}active{% endif %}" href="{% url 'league_list' %}">
+                                    <i class="fas fa-trophy me-2"></i>Leagues
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/divisions/' in request.path %}active{% endif %}" href="{% url 'division_list' %}">
+                                    <i class="fas fa-sitemap me-2"></i>Divisions
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/teams/' in request.path %}active{% endif %}" href="{% url 'team_list' %}">
+                                    <i class="fas fa-users me-2"></i>Teams
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/officials/' in request.path %}active{% endif %}" href="{% url 'official_list' %}">
+                                    <i class="fas fa-user-tie me-2"></i>Officials
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/certifications/' in request.path %}active{% endif %}" href="{% url 'certification_list' %}">
+                                    <i class="fas fa-certificate me-2"></i>Certifications
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/meets/' in request.path %}active{% endif %}" href="{% url 'meet_list' %}">
+                                    <i class="fas fa-calendar-alt me-2"></i>Meets
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/assignments/' in request.path %}active{% endif %}" href="{% url 'assignment_list' %}">
+                                    <i class="fas fa-tasks me-2"></i>Assignments
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/events/' in request.path %}active{% endif %}" href="{% url 'event-list' %}">
+                                    <i class="fas fa-calendar-check me-2"></i>Events
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/strategies/' in request.path %}active{% endif %}" href="{% url 'strategy_list' %}">
+                                    <i class="fas fa-chess me-2"></i>Strategies
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/positions/' in request.path %}active{% endif %}" href="{% url 'position_list' %}">
+                                    <i class="fas fa-map-pin me-2"></i>Positions
+                                </a>
+                            </li>
+                            
+                            {% if user.is_staff %}
+                            <li class="nav-item mt-4">
+                                <h6 class="sidebar-heading px-3 mt-3 mb-2 text-muted">
+                                    <span>Administration</span>
+                                </h6>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if '/users/admin/' in request.path %}active{% endif %}" href="{% url 'user_list' %}">
+                                    <i class="fas fa-users-cog me-2"></i>User Administration
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </nav>
+                <!-- Main content with sidebar -->
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 content py-4">
+            {% else %}
+                <!-- Full width content for non-authenticated users -->
+                <main class="col-12 content py-4">
+            {% endif %}
+                    {% include 'includes/messages.html' %}
+                    {% block content %}{% endblock %}
+                </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row mb-4">
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h6 class="mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">OfficatorXL</h6>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">About</a></li>
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Contact Us</a></li>
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Support</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h6 class="mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Resources</h6>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Documentation</a></li>
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">API</a></li>
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Help Center</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6 mb-4">
+                    <h6 class="mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Legal</h6>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Privacy Policy</a></li>
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Terms of Use</a></li>
+                        <li class="mb-2"><a href="#" class="text-decoration-none text-secondary">Cookies</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <h6 class="mb-3 text-uppercase" style="font-size: 0.75rem; letter-spacing: 0.05em;">Stay Connected</h6>
+                    <div class="d-flex gap-3 mb-3">
+                        <a href="#" class="text-secondary"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="text-secondary"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="text-secondary"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="text-secondary"><i class="fab fa-linkedin-in"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="row border-top pt-3">
+                <div class="col-md-6">
+                    <p class="small text-secondary mb-0">&copy; {% now "Y" %} OfficatorXL. All rights reserved.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="small text-secondary mb-0">Built with <i class="fas fa-heart" style="color: var(--apple-blue);"></i> and Django</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

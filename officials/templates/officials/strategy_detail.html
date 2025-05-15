@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ strategy.get_name_display }} Strategy{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'officials_dashboard' %}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'strategy_list' %}">Strategies</a></li>
+                <li class="breadcrumb-item active">{{ strategy.get_name_display }}</li>
+            </ol>
+        </nav>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ strategy.get_name_display }} Strategy</h1>
+        <div class="d-flex gap-2">
+            {% if user.is_staff %}
+            <a href="{% url 'strategy_update' strategy.pk %}" class="btn btn-outline-primary">
+                <i class="bi bi-pencil me-1"></i>Edit
+            </a>
+            <a href="{% url 'strategy_delete' strategy.pk %}" class="btn btn-outline-danger">
+                <i class="bi bi-trash me-1"></i>Delete
+            </a>
+            {% endif %}
+            <a href="{% url 'strategy_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Back to List
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Strategy Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <tbody>
+                            <tr>
+                                <th style="width: 30%">Name:</th>
+                                <td>{{ strategy.get_name_display }}</td>
+                            </tr>
+                            <tr>
+                                <th>Created:</th>
+                                <td>{{ strategy.created_at }}</td>
+                            </tr>
+                            <tr>
+                                <th>Last Updated:</th>
+                                <td>{{ strategy.updated_at }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="card-title mb-0">Strategy Description</h5>
+                </div>
+                <div class="card-body">
+                    {% if strategy.name == 'QUADRANTS' %}
+                        <p>Quadrants strategy divides the pool into four sections, with officials assigned to specific quadrants.</p>
+                        <div class="text-center mb-3">
+                            <div class="border border-dark" style="width: 300px; height: 150px; margin: auto;">
+                                <div class="d-flex h-100">
+                                    <div class="w-50 h-100 border-end border-dark">
+                                        <div class="h-50 border-bottom border-dark d-flex justify-content-center align-items-center">
+                                            <span>Q1</span>
+                                        </div>
+                                        <div class="h-50 d-flex justify-content-center align-items-center">
+                                            <span>Q3</span>
+                                        </div>
+                                    </div>
+                                    <div class="w-50 h-100">
+                                        <div class="h-50 border-bottom border-dark d-flex justify-content-center align-items-center">
+                                            <span>Q2</span>
+                                        </div>
+                                        <div class="h-50 d-flex justify-content-center align-items-center">
+                                            <span>Q4</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% elif strategy.name == 'SIDES' %}
+                        <p>Sides strategy divides the pool into left and right sides, with officials assigned to specific sides.</p>
+                        <div class="text-center mb-3">
+                            <div class="border border-dark" style="width: 300px; height: 150px; margin: auto;">
+                                <div class="d-flex h-100">
+                                    <div class="w-50 h-100 border-end border-dark d-flex justify-content-center align-items-center">
+                                        <span>LEFT SIDE</span>
+                                    </div>
+                                    <div class="w-50 h-100 d-flex justify-content-center align-items-center">
+                                        <span>RIGHT SIDE</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

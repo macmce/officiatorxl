@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Delete User - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-user-times me-2"></i>Delete User
+        </h1>
+        <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back to User
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Confirm User Deletion</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h4 class="alert-heading">Warning!</h4>
+                        <p>You are about to permanently delete this user account. This action cannot be undone.</p>
+                        <hr>
+                        <p class="mb-0">All data associated with this user will be deleted from the system.</p>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">User Information</h5>
+                            <dl class="row mb-0">
+                                <dt class="col-sm-4">Username:</dt>
+                                <dd class="col-sm-8">{{ user_obj.username }}</dd>
+                                
+                                <dt class="col-sm-4">Full Name:</dt>
+                                <dd class="col-sm-8">{{ user_obj.get_full_name|default:"Not provided" }}</dd>
+                                
+                                <dt class="col-sm-4">Email:</dt>
+                                <dd class="col-sm-8">{{ user_obj.email|default:"Not provided" }}</dd>
+                                
+                                <dt class="col-sm-4">Date Joined:</dt>
+                                <dd class="col-sm-8">{{ user_obj.date_joined|date:"F j, Y" }}</dd>
+                                
+                                <dt class="col-sm-4">Status:</dt>
+                                <dd class="col-sm-8">
+                                    {% if user_obj.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </dd>
+                                
+                                <dt class="col-sm-4">Role:</dt>
+                                <dd class="col-sm-8">
+                                    {% if user_obj.is_superuser %}
+                                        <span class="badge bg-danger">Superuser</span>
+                                    {% elif user_obj.is_staff %}
+                                        <span class="badge bg-warning text-dark">Staff</span>
+                                    {% else %}
+                                        <span class="badge bg-info">Regular User</span>
+                                    {% endif %}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash-alt me-2"></i>Confirm Delete
+                            </button>
+                            <a href="{% url 'user_detail' user_obj.id %}" class="btn btn-secondary">
+                                <i class="fas fa-times-circle me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - OfficatorXL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-certificate me-2"></i>{{ title }}
+        </h1>
+        <a href="{% url 'certification_list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-chevron-left me-1"></i>Back to Certifications
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Certification Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {{ form.name|as_crispy_field }}
+                        
+                        {{ form.abbreviation|as_crispy_field }}
+                        
+                        {{ form.description|as_crispy_field }}
+                        
+                        {{ form.level|as_crispy_field }}
+                        
+                        {% if form.requirements %}
+                            {{ form.requirements|as_crispy_field }}
+                        {% endif %}
+                        
+                        {% if form.validity_period %}
+                            {{ form.validity_period|as_crispy_field }}
+                        {% endif %}
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>Save Certification
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
