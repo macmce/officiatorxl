@@ -256,7 +256,14 @@ To deploy this application on Heroku, follow these steps:
    ```
    This ensures Heroku uses Python 3.11, which is required for compatibility with pandas 2.2.2. Using Python 3.13 causes build failures due to C++ compilation errors with pandas.
 
-5. **Set environment variables**:
+5. **Create a Procfile**:
+   Create a file named `Procfile` (no extension) in the project root with the following content:
+   ```
+   web: gunicorn officiatorxl.wsgi --log-file -
+   ```
+   This tells Heroku how to run your Django application. Make sure `gunicorn` is in your `requirements.txt`.
+
+6. **Set environment variables**:
    ```bash
    heroku config:set DB_NAME=your_database_name --app officiatorxl
    heroku config:set DB_USER=your_database_user --app officiatorxl
@@ -265,7 +272,7 @@ To deploy this application on Heroku, follow these steps:
    heroku config:set DB_PORT=5432 --app officiatorxl
    ```
 
-6. **Deploy to Heroku**:
+7. **Deploy to Heroku**:
    ```bash
    git push heroku main
    ```
@@ -274,12 +281,12 @@ To deploy this application on Heroku, follow these steps:
    git push heroku your-branch:main
    ```
 
-7. **Run migrations on Heroku**:
+8. **Run migrations on Heroku**:
    ```bash
    heroku run python manage.py migrate --app officiatorxl
    ```
 
-8. **Create a superuser on Heroku** (optional):
+9. **Create a superuser on Heroku** (optional):
    ```bash
    heroku run python manage.py createsuperuser --app officiatorxl
    ```
