@@ -69,7 +69,18 @@ The application follows a services-oriented architecture for complex business lo
    ```bash
    python manage.py createsuperuser
    ```
-6. **Run the development server**:
+6. **Set up environment variables**:
+   Create a `.env` file in the project root with the following variables:
+   ```
+   DB_NAME=your_database_name
+   DB_USER=your_database_user
+   DB_PASSWORD=your_database_password
+   DB_HOST=your_database_host
+   DB_PORT=5432
+   ```
+   A template `.env.example` file is provided for reference.
+
+7. **Run the development server**:
    ```bash
    python manage.py runserver
    ```
@@ -216,6 +227,62 @@ The API uses token-based authentication. To access protected endpoints, include 
 ```
 Authentication: Token <your-token>
 ```
+
+## Heroku Deployment
+
+To deploy this application on Heroku, follow these steps:
+
+1. **Create a Heroku account and install the Heroku CLI**:
+   Follow the instructions at [Heroku CLI Installation](https://devcenter.heroku.com/articles/heroku-cli).
+
+2. **Login to Heroku**:
+   ```bash
+   heroku login
+   ```
+
+3. **Create a new Heroku app**:
+   ```bash
+   heroku create officiatorxl
+   ```
+   Or connect to an existing app:
+   ```bash
+   heroku git:remote -a officiatorxl
+   ```
+
+4. **Set Python version**:
+   Create a `.python-version` file in the project root:
+   ```
+   3.11
+   ```
+   This ensures Heroku uses a compatible Python version.
+
+5. **Set environment variables**:
+   ```bash
+   heroku config:set DB_NAME=your_database_name --app officiatorxl
+   heroku config:set DB_USER=your_database_user --app officiatorxl
+   heroku config:set DB_PASSWORD=your_database_password --app officiatorxl
+   heroku config:set DB_HOST=your_database_host --app officiatorxl
+   heroku config:set DB_PORT=5432 --app officiatorxl
+   ```
+
+6. **Deploy to Heroku**:
+   ```bash
+   git push heroku main
+   ```
+   If you're using a different branch:
+   ```bash
+   git push heroku your-branch:main
+   ```
+
+7. **Run migrations on Heroku**:
+   ```bash
+   heroku run python manage.py migrate --app officiatorxl
+   ```
+
+8. **Create a superuser on Heroku** (optional):
+   ```bash
+   heroku run python manage.py createsuperuser --app officiatorxl
+   ```
 
 ## License
 
