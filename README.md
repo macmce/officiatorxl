@@ -254,7 +254,7 @@ To deploy this application on Heroku, follow these steps:
    ```
    3.11
    ```
-   This ensures Heroku uses a compatible Python version.
+   This ensures Heroku uses Python 3.11, which is required for compatibility with pandas 2.2.2. Using Python 3.13 causes build failures due to C++ compilation errors with pandas.
 
 5. **Set environment variables**:
    ```bash
