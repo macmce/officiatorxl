@@ -26,19 +26,24 @@ OfficatorXL is a Django-based web application designed for efficient scheduling 
   - Built with Bootstrap 5 for a responsive, mobile-first experience.
   - Standardized design for filter sections, buttons, pagination, and page layouts across the application for enhanced usability.
   - Clear and intuitive navigation structure.
+- **RESTful API**:
+  - Comprehensive REST API for all major entities (Leagues, Divisions, Teams, Officials, etc.)
+  - API endpoints accessible at `/api/v1/officials/`
+  - Enables integration with mobile applications, third-party systems, and automation scripts
 - **Detailed Views and Forms**:
   - Informative detail views for all entities, showing relevant information and relationships.
   - User-friendly forms for creating and editing data, enhanced with `django-crispy-forms` for better layout and validation display.
 
 ## Architecture
 
-### Services-Oriented Design
-The application follows a services-oriented architecture for complex business logic, promoting separation of concerns and reusability:
+### Architecture Overview
+The application follows a services-oriented architecture for complex business logic, promoting separation of concerns and reusability, and includes a comprehensive API layer:
 
 - **Import Services**: Dedicated services (e.g., `EventImporter`, `PositionImporter`) in the `officials/services/` module encapsulate the logic for parsing files, validating data, and interacting with the database during import operations.
 - **Excel Error Handling**: A specialized module (`excel_errors.py`) provides consistent error tracking and reporting mechanisms for Excel-based imports.
 - **Form Separation**: Form definitions and their validation logic are kept in `forms.py`, separate from view logic.
 - **Reusable Templates**: Utilizes Django's template inheritance and includes (snippets) to maintain a DRY (Don't Repeat Yourself) template structure, ensuring consistency and easier maintenance.
+- **API Layer**: Built using Django REST Framework to provide RESTful API endpoints for all major entities, enabling integration with external systems.
 
 ## Installation
 
@@ -128,6 +133,7 @@ The application relies on the following key Python packages:
 - **pandas**: Powerful data analysis and manipulation library. Used for handling CSV and Excel data during Position imports.
 - **django-crispy-forms**: Controls the rendering behavior of Django forms, allowing for clean, Bootstrap-styled forms.
 - **crispy-bootstrap5**: Bootstrap 5 template pack for `django-crispy-forms`.
+- **Django REST Framework**: Powerful toolkit for building Web APIs.
 - **Pillow**: Python Imaging Library (Fork) used for image processing (e.g., team logos, official photos if implemented).
 
 (See `requirements.txt` for a full list and specific versions.)
@@ -148,6 +154,8 @@ The application relies on the following key Python packages:
         -   `forms.py`: Contains Django form definitions, often integrated with `django-crispy-forms`.
         -   `filters.py`: Implements `django-filter` classes for providing filtering capabilities on list views.
         -   `urls.py`: Defines URL patterns specific to the `officials` app.
+        -   `api_urls.py`: Defines URL patterns for the API endpoints.
+        -   `api_views.py`: Contains ViewSet definitions for the API.
         -   `admin.py`: Configures how models are displayed and managed in the Django admin interface.
         -   `tests/`: Contains automated tests (unit and integration) for the app's functionality.
         -   **`services/`**: Houses complex business logic decoupled from views.
@@ -180,6 +188,34 @@ Default credentials if created via a script or standard setup might be:
 -   **Username**: `admin`
 -   **Email**: `admin@example.com`
 -   **Password**: `adminpassword123` (Change this immediately on a real deployment!)
+
+## API Usage
+
+OfficatorXL provides a RESTful API for programmatic access to all major entities in the system. The API follows RESTful principles and uses Django REST Framework.
+
+### API Endpoints
+
+All API endpoints are accessible under the `/api/v1/officials/` base URL:
+
+- `/api/v1/officials/leagues/` - League management
+- `/api/v1/officials/divisions/` - Division management
+- `/api/v1/officials/teams/` - Team management
+- `/api/v1/officials/officials/` - Officials management
+- `/api/v1/officials/meets/` - Meet management
+- `/api/v1/officials/events/` - Event management
+- `/api/v1/officials/positions/` - Position management
+- `/api/v1/officials/assignments/` - Assignment management
+- `/api/v1/officials/certifications/` - Certification management
+- `/api/v1/officials/strategies/` - Strategy management
+- `/api/v1/officials/userleagueadmins/` - User-League administration
+
+### API Authentication
+
+The API uses token-based authentication. To access protected endpoints, include an Authentication header with your request:
+
+```
+Authentication: Token <your-token>
+```
 
 ## License
 
