@@ -31,26 +31,7 @@ def dashboard(request):
     return render(request, 'users/dashboard.html', context)
 
 
-@login_required
-def profile(request):
-    """View for user profile."""
-    if request.method == 'POST':
-        form = CustomUserChangeForm(request.POST, request.FILES, instance=request.user)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Profile updated successfully!')
-            return redirect('profile')
-    else:
-        form = CustomUserChangeForm(instance=request.user)
-    
-    # Get leagues where the user is an admin
-    admin_league_ids = UserLeagueAdmin.objects.filter(user=request.user).values_list('league_id', flat=True)
-    
-    context = {
-        'form': form,
-        'admin_league_ids': admin_league_ids,
-    }
-    return render(request, 'users/profile.html', context)
+# Profile view removed as it was redundant with user_update
 
 
 def logout_view(request):

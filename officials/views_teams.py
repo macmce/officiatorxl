@@ -4,8 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse
-from .models import Team, Division, Official, Certification
-from .forms import TeamForm, OfficialImportForm
+from .models import Team, Division, Official, Certification, Pool
+from .forms import TeamForm, OfficialImportForm, PoolFormSet
 from .filters import TeamFilter
 import openpyxl
 from openpyxl.utils.exceptions import InvalidFileException
@@ -77,7 +77,9 @@ def team_create(request):
     
     if request.method == 'POST':
         form = TeamForm(request.POST, request.FILES)
-        if form.is_valid():
+        pool_formset = PoolFormSet(request.POST, prefix='pools')
+        
+        if form.is_valid() and pool_formset.is_valid():
             team = form.save(commit=False)
             
             # Check if user has permission to add team to this division
@@ -86,16 +88,24 @@ def team_create(request):
                 return redirect('team_list')
             
             team.save()
+            
+            # Save the pool formset
+            pool_formset.instance = team
+            pool_formset.save()
+            
             messages.success(request, f'Team {team.name} created successfully!')
             return redirect('team_detail', pk=team.pk)
     else:
         form = TeamForm()
+        pool_formset = PoolFormSet(prefix='pools')
+        
         # Limit division choices to those the user has access to
         if not request.user.is_staff:
             form.fields['division'].queryset = accessible_divisions
     
     return render(request, 'officials/team_form.html', {
         'form': form,
+        'pool_formset': pool_formset,
         'title': 'Create Team',
     })
 
@@ -112,12 +122,17 @@ def team_update(request, pk):
     
     if request.method == 'POST':
         form = TeamForm(request.POST, request.FILES, instance=team)
-        if form.is_valid():
+        pool_formset = PoolFormSet(request.POST, instance=team, prefix='pools')
+        
+        if form.is_valid() and pool_formset.is_valid():
             form.save()
+            pool_formset.save()
             messages.success(request, f'Team {team.name} updated successfully!')
             return redirect('team_detail', pk=team.pk)
     else:
         form = TeamForm(instance=team)
+        pool_formset = PoolFormSet(instance=team, prefix='pools')
+        
         # Limit division choices to those the user has access to if not staff
         if not request.user.is_staff:
             user_leagues = request.user.leagues.all()
@@ -125,6 +140,7 @@ def team_update(request, pk):
     
     return render(request, 'officials/team_form.html', {
         'form': form,
+        'pool_formset': pool_formset,
         'title': 'Update Team',
         'team': team,
     })

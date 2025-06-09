@@ -1,5 +1,8 @@
 from django import forms
-from .models import Certification, League, Division, Team, Pool, Official, Meet, Assignment, Event, Position, Strategy
+from django.core.exceptions import ValidationError
+from django.forms import inlineformset_factory
+
+from .models import League, Division, Team, Position, Meet, Assignment, Pool, Event, Strategy, Certification, Official
 
 
 class OfficialImportForm(forms.Form):
@@ -82,6 +85,24 @@ class MeetForm(forms.ModelForm):
             'date': forms.DateInput(attrs={'type': 'date'}),
             'meet_type': forms.Select(),
         }
+        
+    def clean(self):
+        cleaned_data = super().clean()
+        meet_type = cleaned_data.get('meet_type')
+        participating_teams = cleaned_data.get('participating_teams')
+        
+        if meet_type and participating_teams:
+            team_count = participating_teams.count()
+            if meet_type == 'dual' and team_count != 2:
+                raise forms.ValidationError({
+                    'participating_teams': 'Dual meets must have exactly 2 participating teams.'
+                })
+            elif meet_type in ['divisional', 'invitational'] and team_count <= 2:
+                raise forms.ValidationError({
+                    'participating_teams': f'{meet_type.capitalize()} meets must have more than 2 participating teams.'
+                })
+        
+        return cleaned_data
 
 
 class AssignmentForm(forms.ModelForm):
@@ -146,7 +167,7 @@ class EventForm(forms.ModelForm):
                     f'An event with number {event_number} and meet type "{dict(Event.MEET_TYPE_CHOICES).get(meet_type)}" already exists.'
                 )
         
-        return cleaned_data 
+        return cleaned_data
 
 
 class EventImportForm(forms.Form):
@@ -182,14 +203,7 @@ class PositionImportForm(forms.Form):
     import_file = forms.FileField(
         label='Select Import File',
         help_text='Upload an Excel (.xlsx) or CSV (.csv) file containing position data. '
-                  'Required columns: "Role", "Strategy Name", "Location" (optional).'
-    )
-    update_existing = forms.BooleanField(
-        label='Update existing positions',
-        required=False,
-        initial=True,
-        help_text='If checked, positions with the same Role and Strategy Name will be updated. '
-                  'Otherwise, they will be skipped if they already exist.'
+                  'Required columns: "Role", "Strategy Name", "Location".'
     )
 
     def clean_import_file(self):
@@ -198,3 +212,23 @@ class PositionImportForm(forms.Form):
             if not file.name.endswith(('.xlsx', '.csv')):
                 raise forms.ValidationError('Invalid file type. Only .xlsx and .csv files are allowed.')
         return file
+
+
+class PoolForm(forms.ModelForm):
+    """Form for creating and updating pools."""
+    class Meta:
+        model = Pool
+        fields = ['name', 'address', 'length', 'units', 'lanes', 'bidirectional']
+        widgets = {
+            'address': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+# Create a formset for managing pools within a team
+PoolFormSet = inlineformset_factory(
+    Team, 
+    Pool,
+    form=PoolForm,
+    extra=1,  # Show one empty form by default
+    can_delete=True  # Allow deleting pools
+)

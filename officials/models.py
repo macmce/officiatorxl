@@ -121,12 +121,9 @@ class Official(models.Model):
 class Meet(models.Model):
     """Model for swim meets."""
     MEET_TYPE_CHOICES = [
-        ('regular', 'Regular Season'),
-        ('playoff', 'Playoff'),
-        ('championship', 'Championship'),
-        ('tournament', 'Tournament'),
-        ('special', 'Special Event'),
-        ('other', 'Other')
+        ('dual', 'Dual'),
+        ('divisional', 'Divisional'),
+        ('invitational', 'Invitational')
     ]
     
     name = models.CharField(max_length=200)
@@ -135,7 +132,7 @@ class Meet(models.Model):
     host_team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='hosted_meets')
     pool = models.ForeignKey('Pool', on_delete=models.SET_NULL, null=True, blank=True, related_name='meets')
     participating_teams = models.ManyToManyField(Team, related_name='meets')
-    meet_type = models.CharField(max_length=20, choices=MEET_TYPE_CHOICES, default='regular')
+    meet_type = models.CharField(max_length=20, choices=MEET_TYPE_CHOICES, default='dual')
     weather_forecast = models.JSONField(null=True, blank=True)
     
     def __str__(self):
@@ -236,7 +233,6 @@ class Position(models.Model):
     )
     location = models.CharField(
         max_length=100,
-        blank=True,
         help_text="Typical on-field location or area of responsibility for this position (e.g., Backfield, Sideline, Deep Wing)"
     )
     created_at = models.DateTimeField(auto_now_add=True)
@@ -246,7 +242,7 @@ class Position(models.Model):
         verbose_name = 'Position'
         verbose_name_plural = 'Positions'
         ordering = ['strategy', 'role']
-        unique_together = ('role', 'strategy') # A role should be unique within a given strategy
+        unique_together = ('role', 'strategy', 'location') # A role should be unique within a given strategy and location
 
     def __str__(self):
         return f"{self.role} ({self.strategy.name})"

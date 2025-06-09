@@ -5,6 +5,7 @@ from . import views_events
 from . import views_strategy
 from . import views_position
 from . import views_leagues
+from . import views_meets
 
 urlpatterns = [
     # Dashboard
@@ -55,7 +56,10 @@ urlpatterns = [
     # Meet URLs
     path('meets/', views.meet_list, name='meet_list'),
     path('meets/<int:pk>/', views.meet_detail, name='meet_detail'),
-    path('meets/create/', views.meet_create, name='meet_create'),
+    path('meets/create/', views_meets.meet_create, name='meet_create'),
+    path('meets/create/step1/', views_meets.meet_create_step1, name='meet_create_step1'),
+    path('meets/create/step2/', views_meets.meet_create_step2, name='meet_create_step2'),
+    path('meets/create/step3/', views_meets.meet_create_step3, name='meet_create_step3'),
     path('meets/<int:pk>/update/', views.meet_update, name='meet_update'),
     path('meets/<int:pk>/delete/', views.meet_delete, name='meet_delete'),
     
@@ -79,8 +83,11 @@ urlpatterns = [
     path('events/download-template/', views_events.DownloadEventTemplateView.as_view(), name='event-download-template'),
 
     # API endpoints
-    path('api/team/<int:team_id>/pools/', api_views.team_pools, name='api_team_pools'),
+    path('api/teams/<int:team_id>/pools/', api_views.team_pools, name='api_team_pools'),
+    path('api/divisions/<int:division_id>/teams/', api_views.division_teams, name='api_division_teams'),
+    path('api/leagues/<int:league_id>/divisions/', api_views.league_divisions, name='api_league_divisions'),
     path('api/weather/', api_views.weather_forecast, name='api_weather_forecast'),
+    path('api/weather/pool/', api_views.pool_weather, name='api_pool_weather'),
     
     # Strategy URLs
     path('strategies/', views_strategy.strategy_list, name='strategy_list'),

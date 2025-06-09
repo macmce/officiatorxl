@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Create Meet - Step 3: Review and Save</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Progress bar -->
+                    <div class="progress mb-4">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">Step 3 of 3</div>
+                    </div>
+                    
+                    <!-- Comprehensive summary of all selections -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Meet Summary</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h6 class="border-bottom pb-2">Basic Information</h6>
+                                    <p><strong>League:</strong> {{ meet_data.league }}</p>
+                                    <p><strong>Date:</strong> {{ meet_data.date }}</p>
+                                    <p><strong>Meet Type:</strong> {{ meet_data.meet_type_display }}</p>
+                                    <p><strong>Name:</strong> {{ meet_data.name }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="border-bottom pb-2">Teams</h6>
+                                    {% if meet_data.host_team %}
+                                    <p><strong>Host Team:</strong> {{ meet_data.host_team }}</p>
+                                    {% endif %}
+                                    <p><strong>Participating Teams:</strong></p>
+                                    <ul class="mb-0">
+                                        {% for team in meet_data.participating_teams %}
+                                        <li>{{ team }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="border-bottom pb-2">Pool Information</h6>
+                                    <p><strong>Pool:</strong> {{ meet_data.pool }}</p>
+                                    {% if meet_data.pool_details %}
+                                    <p><strong>Address:</strong> {{ meet_data.pool_details.address }}</p>
+                                    <p><strong>Length:</strong> {{ meet_data.pool_details.length }} {{ meet_data.pool_details.units }}</p>
+                                    <p><strong>Lanes:</strong> {{ meet_data.pool_details.lanes }}</p>
+                                    <p><strong>Bidirectional:</strong> {% if meet_data.pool_details.bidirectional %}Yes{% else %}No{% endif %}</p>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="border-bottom pb-2">Weather Forecast</h6>
+                                    {% if meet_data.weather %}
+                                    <div id="weatherSummary">
+                                        <p><strong>Temperature:</strong> {{ meet_data.weather.forecast.min_temp }}°F - {{ meet_data.weather.forecast.max_temp }}°F</p>
+                                        <p><strong>Conditions:</strong> {{ meet_data.weather.forecast.description }}</p>
+                                        <p><strong>Precipitation Chance:</strong> {{ meet_data.weather.forecast.pop }}%</p>
+                                    </div>
+                                    {% else %}
+                                    <p class="text-muted">No weather data available</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" id="meetFormStep3">
+                        {% csrf_token %}
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> Please review all information above before saving the meet.
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'meet_create_step2' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Step 2
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>Save Meet
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

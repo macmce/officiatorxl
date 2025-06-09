@@ -92,10 +92,8 @@ class PositionImportView(LoginRequiredMixin, FormView):
     def form_valid(self, form):
         # This is where the file processing logic will go.
         import_file = form.cleaned_data['import_file']
-        update_existing = form.cleaned_data['update_existing']
 
         created_count = 0
-        updated_count = 0
         skipped_count = 0
         error_count = 0
         errors_list = []
@@ -109,21 +107,21 @@ class PositionImportView(LoginRequiredMixin, FormView):
                 messages.error(self.request, "Unsupported file format. Please use .xlsx or .csv.")
                 return self.form_invalid(form)
 
-            expected_columns = ['Role', 'Strategy Name'] # Location is optional
+            expected_columns = ['Role', 'Strategy Name', 'Location'] # All are required
             if not all(col in df.columns for col in expected_columns):
                 missing_cols = [col for col in expected_columns if col not in df.columns]
                 messages.error(self.request, f"Missing required columns: {', '.join(missing_cols)}. "
-                                            f"File must contain 'Role' and 'Strategy Name'. 'Location' is optional.")
+                                            f"File must contain 'Role', 'Strategy Name', and 'Location'.")
                 return self.form_invalid(form)
 
             for index, row in df.iterrows():
                 row_num = index + 2 # For user-friendly row numbering (1-based index + header)
                 role = str(row.get('Role', '')).strip()
                 strategy_name = str(row.get('Strategy Name', '')).strip()
-                location = str(row.get('Location', '')).strip()
+                location = str(row.get('Location', '')).strip()  # Location is required
 
-                if not role or not strategy_name:
-                    errors_list.append(f"Row {row_num}: 'Role' and 'Strategy Name' are required.")
+                if not role or not strategy_name or not location:
+                    errors_list.append(f"Row {row_num}: 'Role', 'Strategy Name', and 'Location' are required.")
                     error_count += 1
                     continue
 
@@ -157,26 +155,17 @@ class PositionImportView(LoginRequiredMixin, FormView):
                 }
 
                 try:
-                    if update_existing:
-                        obj, created = Position.objects.update_or_create(
-                            role=role,
-                            strategy=strategy,
-                            defaults={'location': location}
-                        )
-                        if created:
-                            created_count += 1
-                        else:
-                            updated_count += 1
+                    # Always use get_or_create and skip existing positions rather than updating them
+                    obj, created = Position.objects.get_or_create(
+                        role=role,
+                        strategy=strategy,
+                        location=location,
+                        defaults={}
+                    )
+                    if created:
+                        created_count += 1
                     else:
-                        obj, created = Position.objects.get_or_create(
-                            role=role,
-                            strategy=strategy,
-                            defaults={'location': location}
-                        )
-                        if created:
-                            created_count += 1
-                        else:
-                            skipped_count += 1
+                        skipped_count += 1
                 except IntegrityError as e:
                     errors_list.append(f"Row {row_num} (Role: {role}, Strategy: {strategy.get_name_display()}): Error saving - {e}")
                     error_count += 1
@@ -186,10 +175,8 @@ class PositionImportView(LoginRequiredMixin, FormView):
             
             if created_count > 0:
                 messages.success(self.request, f"{created_count} positions created successfully.")
-            if updated_count > 0:
-                messages.success(self.request, f"{updated_count} positions updated successfully.")
             if skipped_count > 0:
-                messages.info(self.request, f"{skipped_count} positions were skipped (already exist and 'update existing' was not checked)." )
+                messages.info(self.request, f"{skipped_count} positions were skipped because they already exist.")
             
             if error_count > 0:
                 error_summary = f"{error_count} errors occurred during import. "
@@ -200,7 +187,7 @@ class PositionImportView(LoginRequiredMixin, FormView):
                 messages.error(self.request, error_summary)
                 # Optionally, re-render the form if there are errors to show them more prominently
                 # return self.form_invalid(form) 
-            elif not errors_list and created_count == 0 and updated_count == 0 and skipped_count == 0:
+            elif not errors_list and created_count == 0 and skipped_count == 0:
                  messages.info(self.request, "No positions were imported. The file might be empty or all rows were skipped/errored out before processing.")
 
         except FileNotFoundError:

@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import CustomUser
-from .forms import CustomUserCreationForm, CustomUserChangeForm, AdminUserEditForm, UserRoleForm
+from .forms import CustomUserCreationForm, CustomUserChangeForm, AdminUserEditForm, UserRoleForm, RoleRequiredUserCreationForm
 from officials.models import League, Team, UserLeagueAdmin
 
 def is_admin(user):
@@ -36,34 +36,27 @@ def user_list(request):
         'search_query': search_query,
     })
 
-@login_required
-@user_passes_test(is_admin)
-def user_detail(request, pk):
-    """View for showing user details (admin only)."""
-    user = get_object_or_404(CustomUser, pk=pk)
-    user_leagues = user.leagues.all()
-    
-    # Get the leagues where the user is an admin
-    admin_league_ids = UserLeagueAdmin.objects.filter(user=user).values_list('league_id', flat=True)
-    
-    return render(request, 'users/admin/user_detail.html', {
-        'user_obj': user,  # Use user_obj to avoid conflict with request.user
-        'user_leagues': user_leagues,
-        'admin_league_ids': admin_league_ids,
-    })
+# user_detail view has been removed as it was redundant with user_update
 
 @login_required
 @user_passes_test(is_admin)
 def user_create(request):
     """View for creating a new user (admin only)."""
     if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
+        form = RoleRequiredUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            messages.success(request, f'User {user.username} created successfully!')
-            return redirect('user_detail', pk=user.pk)
+            try:
+                user = form.save()
+                messages.success(request, f'User {user.username} created successfully with assigned roles!')
+                return redirect('user_update', pk=user.pk)
+            except Exception as e:
+                messages.error(request, f'Error creating user: {str(e)}')
+        else:
+            # Add specific error messages for form validation failures
+            if form.errors:
+                messages.error(request, 'Please correct the errors below to create the user.')
     else:
-        form = CustomUserCreationForm()
+        form = RoleRequiredUserCreationForm()
     
     return render(request, 'users/admin/user_form.html', {
         'form': form,
@@ -75,13 +68,30 @@ def user_create(request):
 def user_update(request, pk):
     """View for updating an existing user (admin only)."""
     user = get_object_or_404(CustomUser, pk=pk)
+    user_leagues = user.leagues.all()
+    
+    # Get the leagues where the user is an admin
+    admin_league_ids = UserLeagueAdmin.objects.filter(user=user).values_list('league_id', flat=True)
     
     if request.method == 'POST':
         form = AdminUserEditForm(request.POST, request.FILES, instance=user)
         if form.is_valid():
-            form.save()
+            user = form.save()
+            
+            # Handle league associations
+            selected_leagues = form.cleaned_data.get('leagues')
+            if selected_leagues:
+                user.leagues.set(selected_leagues)
+            
+            # Handle team associations
+            selected_teams = form.cleaned_data.get('teams')
+            if selected_teams:
+                user.teams.set(selected_teams)
+            else:
+                user.teams.clear()
+            
             messages.success(request, f'User {user.username} updated successfully!')
-            return redirect('user_detail', pk=user.pk)
+            return redirect('user_update', pk=user.pk)
     else:
         form = AdminUserEditForm(instance=user)
     
@@ -89,6 +99,8 @@ def user_update(request, pk):
         'form': form,
         'title': 'Update User',
         'user_obj': user,
+        'user_leagues': user_leagues,
+        'admin_league_ids': admin_league_ids,
     })
 
 @login_required
@@ -123,7 +135,7 @@ def user_roles(request, pk):
         if form.is_valid():
             form.save()
             messages.success(request, f'Roles for {user.username} updated successfully!')
-            return redirect('user_detail', pk=user.pk)
+            return redirect('user_update', pk=user.pk)
     else:
         form = UserRoleForm(instance=user)
     
@@ -168,7 +180,7 @@ def user_leagues(request, pk):
                     )
         
         messages.success(request, f'League associations and admin roles for {user.username} updated successfully!')
-        return redirect('user_detail', pk=user.pk)
+        return redirect('user_update', pk=user.pk)
     
     user_league_ids = user.leagues.values_list('id', flat=True)
     
@@ -203,7 +215,7 @@ def user_teams(request, pk):
             user.teams.add(*selected_teams)
         
         messages.success(request, f'Team associations for {user.username} updated successfully!')
-        return redirect('user_detail', pk=user.pk)
+        return redirect('user_update', pk=user.pk)
     
     user_team_ids = user.teams.values_list('id', flat=True)
     

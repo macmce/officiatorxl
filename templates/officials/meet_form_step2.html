@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-10">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Create Meet - Step 2: Pool & Weather</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Progress bar -->
+                    <div class="progress mb-4">
+                        <div class="progress-bar bg-info" role="progressbar" style="width: 66%" aria-valuenow="66" aria-valuemin="0" aria-valuemax="100">Step 2 of 3</div>
+                    </div>
+                    
+                    <!-- Summary of Step 1 selections -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">Summary of Step 1</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>League:</strong> {{ meet_data.league }}</p>
+                                    <p><strong>Date:</strong> {{ meet_data.date }}</p>
+                                    <p><strong>Name:</strong> {{ meet_data.name }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Meet Type:</strong> {{ meet_data.meet_type_display }}</p>
+                                    {% if meet_data.host_team %}
+                                    <p><strong>Host Team:</strong> {{ meet_data.host_team }}</p>
+                                    {% endif %}
+                                    <p><strong>Participating Teams:</strong></p>
+                                    <ul class="mb-0">
+                                        {% for team in meet_data.participating_teams %}
+                                        <li>{{ team }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="post" id="meetFormStep2">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.pool|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-3" id="weatherForecast">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">Weather Forecast</h5>
+                            </div>
+                            <div class="card-body" id="weatherContent">
+                                <div class="text-center">
+                                    <div class="spinner-border text-info" role="status" id="weatherLoading" style="display: none;">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <div id="weatherData">
+                                        <p class="text-center text-muted">Select a pool and date to view the weather forecast</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{% url 'meet_create_step1' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Step 1
+                            </a>
+                            <button type="submit" class="btn btn-info text-white">
+                                <i class="fas fa-arrow-right me-2"></i>Continue to Step 3
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const poolSelect = document.getElementById('id_pool');
+        const weatherForecast = document.getElementById('weatherForecast');
+        const weatherData = document.getElementById('weatherData');
+        const weatherLoading = document.getElementById('weatherLoading');
+
+        // Function to get weather forecast for the selected pool
+        function getWeatherForecast() {
+            const poolId = poolSelect.value;
+            // The date has been preserved from step 1 and stored in session data
+            
+            if (!poolId) {
+                weatherData.innerHTML = '<p class="text-center text-muted">Please select a pool to view the weather forecast</p>';
+                return;
+            }
+            
+            weatherLoading.style.display = 'block';
+            weatherData.innerHTML = '';
+            
+            // Fetch weather data for the pool's location
+            fetch(`/api/weather/pool/?pool_id=${poolId}`)
+                .then(response => response.json())
+                .then(data => {
+                    weatherLoading.style.display = 'none';
+                    
+                    if (data.error) {
+                        weatherData.innerHTML = `<div class="alert alert-warning">${data.error}</div>`;
+                        return;
+                    }
+                    
+                    // Format and display weather data
+                    let weatherHtml = '<div class="row">';
+                    
+                    // Current conditions
+                    weatherHtml += '<div class="col-md-6 mb-3">';
+                    weatherHtml += '<div class="card h-100">';
+                    weatherHtml += '<div class="card-header bg-light">Current Conditions</div>';
+                    weatherHtml += '<div class="card-body text-center">';
+                    weatherHtml += `<h3>${data.current.temp}°F</h3>`;
+                    weatherHtml += `<div><img src="${data.current.icon_url}" alt="${data.current.description}" width="50"></div>`;
+                    weatherHtml += `<p>${data.current.description}</p>`;
+                    weatherHtml += `<p>Wind: ${data.current.wind_speed} mph</p>`;
+                    weatherHtml += '</div></div></div>';
+                    
+                    // Forecast for meet day
+                    weatherHtml += '<div class="col-md-6 mb-3">';
+                    weatherHtml += '<div class="card h-100">';
+                    weatherHtml += '<div class="card-header bg-light">Meet Day Forecast</div>';
+                    weatherHtml += '<div class="card-body text-center">';
+                    
+                    if (data.forecast) {
+                        weatherHtml += `<h3>High: ${data.forecast.max_temp}°F | Low: ${data.forecast.min_temp}°F</h3>`;
+                        weatherHtml += `<div><img src="${data.forecast.icon_url}" alt="${data.forecast.description}" width="50"></div>`;
+                        weatherHtml += `<p>${data.forecast.description}</p>`;
+                        weatherHtml += `<p>Precipitation: ${data.forecast.pop}%</p>`;
+                    } else {
+                        weatherHtml += '<p>No forecast available for meet day</p>';
+                    }
+                    
+                    weatherHtml += '</div></div></div>';
+                    weatherHtml += '</div>';
+                    
+                    weatherData.innerHTML = weatherHtml;
+                })
+                .catch(error => {
+                    weatherLoading.style.display = 'none';
+                    weatherData.innerHTML = '<div class="alert alert-danger">Error fetching weather forecast. Please try again later.</div>';
+                });
+        }
+        
+        // The pool options are now pre-loaded server-side based on meet type
+        // No need to manually fetch pools via JavaScript as they're filtered in the view
+        
+        // Event listeners
+        poolSelect.addEventListener('change', getWeatherForecast);
+        
+        // Initialize the form - the pools are pre-loaded server-side based on meet type
+        
+        // If a pool is already selected (coming back from step 3), get the weather
+        if (poolSelect.value) {
+            getWeatherForecast();
+        }
+    });
+</script>
+{% endblock %}

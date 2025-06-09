@@ -59,7 +59,59 @@
                         
                         {{ form.address|as_crispy_field }}
                         
-
+                        <!-- Pool Formset Section -->
+                        <div class="card mt-4 mb-4">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">Team Pools</h5>
+                                <p class="small mb-0">A team must have at least one pool</p>
+                            </div>
+                            <div class="card-body">
+                                {{ pool_formset.management_form }}
+                                
+                                <div id="pool-forms">
+                                    {% for pool_form in pool_formset %}
+                                    <div class="pool-form mb-4 p-3 border rounded{% if forloop.counter > 1 %} mt-4{% endif %}">
+                                        {% if pool_formset.can_delete %}
+                                        <div class="float-end">
+                                            {{ pool_form.DELETE|as_crispy_field }}
+                                        </div>
+                                        {% endif %}
+                                        
+                                        <h6 class="mb-3">Pool #{{ forloop.counter }}</h6>
+                                        
+                                        {{ pool_form.id }}
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                {{ pool_form.name|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-6">
+                                                {{ pool_form.length|as_crispy_field }}
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                {{ pool_form.units|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                {{ pool_form.lanes|as_crispy_field }}
+                                            </div>
+                                            <div class="col-md-4">
+                                                {{ pool_form.bidirectional|as_crispy_field }}
+                                            </div>
+                                        </div>
+                                        
+                                        {{ pool_form.address|as_crispy_field }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                
+                                <button type="button" id="add-pool" class="btn btn-outline-info mt-2">
+                                    <i class="fas fa-plus me-1"></i>Add Another Pool
+                                </button>
+                            </div>
+                        </div>
                         
                         <div class="d-grid gap-2 mt-4">
                             <button type="submit" class="btn btn-warning">
@@ -72,4 +124,69 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const poolForms = document.getElementById('pool-forms');
+        const addPoolBtn = document.getElementById('add-pool');
+        const totalFormsInput = document.querySelector('#id_pools-TOTAL_FORMS');
+        
+        // Get the number of forms currently in the formset
+        let formCount = parseInt(totalFormsInput.value);
+        
+        // Add new pool form when Add Another Pool button is clicked
+        addPoolBtn.addEventListener('click', function() {
+            // Clone the last form
+            const newForm = poolForms.children[poolForms.children.length - 1].cloneNode(true);
+            
+            // Update form index in all inputs, labels and IDs
+            const inputs = newForm.querySelectorAll('input, select, textarea');
+            const labels = newForm.querySelectorAll('label');
+            
+            // Reset form values
+            newForm.querySelectorAll('input[type=text], input[type=number], textarea').forEach(function(input) {
+                input.value = '';
+            });
+            
+            // Reset checkboxes
+            newForm.querySelectorAll('input[type=checkbox]').forEach(function(checkbox) {
+                checkbox.checked = false;
+            });
+            
+            // Update form count in all elements
+            inputs.forEach(function(input) {
+                if (input.id) {
+                    input.id = input.id.replace(/-\d+-/, `-${formCount}-`);
+                }
+                if (input.name) {
+                    input.name = input.name.replace(/-\d+-/, `-${formCount}-`);
+                }
+            });
+            
+            labels.forEach(function(label) {
+                if (label.htmlFor) {
+                    label.htmlFor = label.htmlFor.replace(/-\d+-/, `-${formCount}-`);
+                }
+            });
+            
+            // Update heading
+            const heading = newForm.querySelector('h6');
+            if (heading) {
+                heading.textContent = `Pool #${formCount + 1}`;
+            }
+            
+            // Add spacing if not the first form
+            newForm.classList.add('mt-4');
+            
+            // Add the new form to the DOM
+            poolForms.appendChild(newForm);
+            
+            // Update the total form count
+            formCount++;
+            totalFormsInput.value = formCount;
+        });
+    });
+</script>
 {% endblock %}
