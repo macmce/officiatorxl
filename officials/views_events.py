@@ -28,6 +28,9 @@ class EventListView(LoginRequiredMixin, FilterView):
         # Start with the filtered queryset from django-filter
         queryset = super().get_queryset()
         
+        # Prefetch related event positions for counting
+        queryset = queryset.prefetch_related('event_positions')
+        
         # Order events by event_number, then meet_type
         return queryset.order_by('event_number', 'meet_type')
 
@@ -54,6 +57,13 @@ class EventDetailView(LoginRequiredMixin, DetailView):
     model = Event
     template_name = 'officials/event_detail.html'
     context_object_name = 'event'
+    
+    def get_queryset(self):
+        # Prefetch related event_positions and their positions
+        return super().get_queryset().prefetch_related(
+            'event_positions__position',
+            'event_positions__position__strategy'
+        )
     
     def render_to_response(self, context, **response_kwargs):
         # Override to ensure standard Django template rendering

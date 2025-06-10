@@ -1,8 +1,8 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.forms import inlineformset_factory
+from django.forms import inlineformset_factory, modelformset_factory
 
-from .models import League, Division, Team, Position, Meet, Assignment, Pool, Event, Strategy, Certification, Official
+from .models import League, Division, Team, Position, Meet, Assignment, Pool, Event, Strategy, Certification, Official, EventPosition
 
 
 class OfficialImportForm(forms.Form):
@@ -186,17 +186,28 @@ class EventImportForm(forms.Form):
 class PositionForm(forms.ModelForm):
     class Meta:
         model = Position
-        fields = ['role', 'strategy', 'location']
+        fields = ['role', 'strategy', 'location', 'minimum_certification']
         widgets = {
             'role': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Referee, Umpire'}),
             'strategy': forms.Select(attrs={'class': 'form-select'}),
             'location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g., Backfield, Deep Wing'}),
+            'minimum_certification': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['strategy'].queryset = Strategy.objects.all()
         self.fields['strategy'].empty_label = "Select a Strategy"
+        
+        # Set up the certification field with default value
+        self.fields['minimum_certification'].queryset = Certification.objects.all().order_by('level', 'name')
+        self.fields['minimum_certification'].empty_label = "No minimum certification required"
+        
+        # If no certification is selected, try to find level 3 as default
+        if not self.initial.get('minimum_certification'):
+            level_3_cert = Certification.objects.filter(level=3).first()
+            if level_3_cert:
+                self.initial['minimum_certification'] = level_3_cert.id
 
 
 class PositionImportForm(forms.Form):
@@ -231,4 +242,35 @@ PoolFormSet = inlineformset_factory(
     form=PoolForm,
     extra=1,  # Show one empty form by default
     can_delete=True  # Allow deleting pools
+)
+
+
+class EventPositionForm(forms.ModelForm):
+    """Form for managing positions associated with events."""
+    class Meta:
+        model = EventPosition
+        fields = ['position', 'is_mandatory']
+        widgets = {
+            'position': forms.Select(attrs={'class': 'form-select'}),
+            'is_mandatory': forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        }
+
+
+# Create a formset for managing multiple event positions
+EventPositionFormSet = modelformset_factory(
+    EventPosition,
+    form=EventPositionForm,
+    extra=3,  # Show three empty forms by default
+    can_delete=True
+)
+
+
+# Create an inline formset for managing positions within an event
+EventPositionInlineFormSet = inlineformset_factory(
+    Event,
+    EventPosition,
+    form=EventPositionForm,
+    extra=3,  # Show three empty forms by default
+    can_delete=True,
+    fields=['position', 'is_mandatory']
 )

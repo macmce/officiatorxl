@@ -235,8 +235,23 @@ class Position(models.Model):
         max_length=100,
         help_text="Typical on-field location or area of responsibility for this position (e.g., Backfield, Sideline, Deep Wing)"
     )
+    minimum_certification = models.ForeignKey(
+        Certification,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='required_positions',
+        help_text="The minimum certification level required for this position"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Add many-to-many relationship to Event through EventPosition
+    events = models.ManyToManyField(
+        'Event',
+        through='EventPosition',
+        related_name='positions'
+    )
 
     class Meta:
         verbose_name = 'Position'
@@ -246,3 +261,35 @@ class Position(models.Model):
 
     def __str__(self):
         return f"{self.role} ({self.strategy.name})"
+
+
+class EventPosition(models.Model):
+    """Model for associating positions with events and indicating whether they're mandatory."""
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.CASCADE,
+        related_name='event_positions',
+        help_text="Event that requires this position"
+    )
+    position = models.ForeignKey(
+        Position,
+        on_delete=models.CASCADE,
+        related_name='event_positions',
+        help_text="Position required for this event"
+    )
+    is_mandatory = models.BooleanField(
+        default=True,
+        help_text="Indicates if this position is mandatory for the event"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Event Position'
+        verbose_name_plural = 'Event Positions'
+        unique_together = ('event', 'position')
+        ordering = ['event', 'position']
+
+    def __str__(self):
+        mandatory_status = "Mandatory" if self.is_mandatory else "Optional"
+        return f"{self.position.role} for {self.event} ({mandatory_status})"

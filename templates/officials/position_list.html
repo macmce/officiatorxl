@@ -52,7 +52,8 @@
                         <div class="card-body">
                             <p class="card-text">
                                 <strong>Strategy:</strong> {{ position.strategy.get_name_display }}<br>
-                                <strong>Location:</strong> {{ position.location|default:"Not specified" }}
+                                <strong>Location:</strong> {{ position.location|default:"Not specified" }}<br>
+                                <strong>Min Certification:</strong> {{ position.minimum_certification.name|default:"None" }}
                             </p>
                         </div>
                         <div class="card-footer">
@@ -82,6 +83,7 @@
                                     <th>Role</th>
                                     <th>Strategy</th>
                                     <th>Location</th>
+                                    <th>Min Certification</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -91,6 +93,7 @@
                                     <td>{{ position.role }}</td>
                                     <td>{{ position.strategy.get_name_display }}</td>
                                     <td>{{ position.location|default:"N/A" }}</td>
+                                    <td>{{ position.minimum_certification.name|default:"None" }}</td>
                                     <td>
                                         <div class="btn-group btn-group-sm">
                                             <a href="{% url 'position_update' position.pk %}" class="btn btn-outline-primary">

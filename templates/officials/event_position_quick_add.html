@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quick Add Positions to Events{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="card-title mb-0">Quick Add Positions to Events</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'event-position-create' %}">
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="event" class="form-label">Select Event</label>
+                        <select name="event" id="event" class="form-select" required>
+                            <option value="">-- Select Event --</option>
+                            {% for event in events %}
+                                <option value="{{ event.id }}">{{ event }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="position" class="form-label">Select Position</label>
+                        <select name="position" id="position" class="form-select" required>
+                            <option value="">-- Select Position --</option>
+                            {% for position in positions %}
+                                <option value="{{ position.id }}">{{ position.role }} ({{ position.strategy }}) - {{ position.location }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="is_mandatory" id="is_mandatory" checked>
+                    <label class="form-check-label" for="is_mandatory">
+                        This position is mandatory (required) for the event
+                    </label>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{% url 'event-position-list' %}" class="btn btn-secondary">Back to List</a>
+                    <button type="submit" class="btn btn-success">Add Position</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

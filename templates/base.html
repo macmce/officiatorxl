@@ -281,6 +281,11 @@
                                 </a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link {% if '/event-positions/' in request.path %}active{% endif %}" href="{% url 'event-position-list' %}">
+                                    <i class="fas fa-diagram-project me-2"></i>Event Positions
+                                </a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link {% if '/strategies/' in request.path %}active{% endif %}" href="{% url 'strategy_list' %}">
                                     <i class="fas fa-chess me-2"></i>Strategies
                                 </a>

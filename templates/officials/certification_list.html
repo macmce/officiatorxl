@@ -23,7 +23,7 @@
 
     {% if page_obj %}
         <!-- Card View -->
-        <div id="card-view" style="display: none;">
+        <div id="card-view" style="display: block;">
         <div class="row">
             {% for certification in page_obj %}
                 <div class="col-md-6 col-lg-4 mb-4">
@@ -63,7 +63,7 @@
         </div>
 
         <!-- List View -->
-        <div id="list-view" class="table-responsive d-none">
+        <div id="list-view" class="table-responsive" style="display: none;">
             <table class="table table-striped table-hover">
                 <thead class="table-success">
                     <tr>
@@ -196,7 +196,7 @@
         
         function showCardView() {
             // Show/hide content using style.display for better reliability
-            cardView.style.display = '';
+            cardView.style.display = 'block';
             listView.style.display = 'none';
             
             // Update button styling
@@ -210,7 +210,7 @@
         function showListView() {
             // Show/hide content using style.display for better reliability
             cardView.style.display = 'none';
-            listView.style.display = '';
+            listView.style.display = 'block';
             
             // Update button styling
             listViewBtn.classList.add('active', 'btn-secondary');

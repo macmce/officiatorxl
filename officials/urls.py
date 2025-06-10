@@ -6,6 +6,7 @@ from . import views_strategy
 from . import views_position
 from . import views_leagues
 from . import views_meets
+from . import views_event_positions
 
 urlpatterns = [
     # Dashboard
@@ -81,6 +82,14 @@ urlpatterns = [
     path('events/delete-all/', views_events.EventDeleteAllView.as_view(), name='event-delete-all'),
     path('events/delete-selected/', views_events.EventDeleteSelectedView.as_view(), name='event-delete-selected'),
     path('events/download-template/', views_events.DownloadEventTemplateView.as_view(), name='event-download-template'),
+    
+    # Event Position URLs
+    path('event-positions/', views_event_positions.EventPositionListView.as_view(), name='event-position-list'),
+    path('event-positions/<int:pk>/manage/', views_event_positions.EventPositionManageView.as_view(), name='event-position-manage'),
+    path('event-positions/create/', views_event_positions.EventPositionCreateView.as_view(), name='event-position-create'),
+    path('event-positions/quick-add/', views_event_positions.EventPositionQuickAddView.as_view(), name='event-position-quick-add'),
+    path('event-positions/auto-assign/', views_event_positions.AutoAssignPositionsView.as_view(), name='event-position-auto-assign'),
+    path('event-positions/remove-all/', views_event_positions.RemoveAllEventPositionsView.as_view(), name='event-position-remove-all'),
 
     # API endpoints
     path('api/teams/<int:team_id>/pools/', api_views.team_pools, name='api_team_pools'),
