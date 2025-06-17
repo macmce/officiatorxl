@@ -95,6 +95,10 @@ class LeagueAPITests(APITestCase):
 
 class CertificationAPITests(APITestCase):
     def setUp(self):
+        # Clean up any existing certifications to avoid test interference
+        Certification.objects.all().delete()
+        
+        # Create a test user and certifications
         self.user = User.objects.create_user(username='testuser_cert', password='testpassword123')
         self.cert1 = Certification.objects.create(name='Basic Scorer', abbreviation='BS', level=1)
         self.cert2 = Certification.objects.create(name='Advanced Timer', abbreviation='AT', level=2)

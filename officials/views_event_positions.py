@@ -142,6 +142,9 @@ class AutoAssignPositionsView(LoginRequiredMixin, View):
         oof_positions = [p for p in all_positions if "OOF".lower() in p.role.lower()]
         oof_finish_end_in = [p for p in oof_positions if p.location and "Finish End In".lower() in p.location.lower()]
         verifier_positions = [p for p in all_positions if "Verifier".lower() in p.role.lower()]
+        snt_positions = [p for p in all_positions if p.role.startswith("SNT")]
+        snt_turn_positions = [p for p in snt_positions if p.location and "Turn".lower() in p.location.lower()]
+        snt_start_positions = [p for p in snt_positions if p.location and "Start".lower() in p.location.lower()]
         
         # Get all events at once
         all_events = list(Event.objects.all())
@@ -164,6 +167,12 @@ class AutoAssignPositionsView(LoginRequiredMixin, View):
                 found_positions.append(f"- Finish End In Location: {len(oof_finish_end_in)} positions")
         if verifier_positions:
             found_positions.append(f"Verifier ({len(verifier_positions)} positions)")
+        if snt_positions:
+            found_positions.append(f"SNT ({len(snt_positions)} positions)")
+            if snt_turn_positions:
+                found_positions.append(f"- Turn Location: {len(snt_turn_positions)} positions")
+            if snt_start_positions:
+                found_positions.append(f"- Start Location: {len(snt_start_positions)} positions")
             
         if not found_positions:
             messages.error(request, "Could not find the required positions in the database. Please create these positions first.")
@@ -242,6 +251,33 @@ class AutoAssignPositionsView(LoginRequiredMixin, View):
                 )
                 positions_added += 1
         
+        # Process SNT positions
+        for event in all_events:
+            # Handle SNT positions with "Turn" in location (mandatory for all events)
+            for position in snt_turn_positions:
+                if (event.id, position.id) not in existing_assignments:
+                    position_assignments.append(
+                        EventPosition(
+                            event=event,
+                            position=position,
+                            is_mandatory=True
+                        )
+                    )
+                    positions_added += 1
+                    
+            # Handle SNT positions with "Start" in location (mandatory only for non-25 events)
+            if "25" not in event.name:  # Only for events without '25' in the name
+                for position in snt_start_positions:
+                    if (event.id, position.id) not in existing_assignments:
+                        position_assignments.append(
+                            EventPosition(
+                                event=event,
+                                position=position,
+                                is_mandatory=True
+                            )
+                        )
+                        positions_added += 1
+    
         # Process optional Verifier positions for all events
         for event in all_events:
             for position in verifier_positions:

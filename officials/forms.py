@@ -201,7 +201,7 @@ class PositionForm(forms.ModelForm):
         
         # Set up the certification field with default value
         self.fields['minimum_certification'].queryset = Certification.objects.all().order_by('level', 'name')
-        self.fields['minimum_certification'].empty_label = "No minimum certification required"
+        self.fields['minimum_certification'].empty_label = "No Minimum Certification"
         
         # If no certification is selected, try to find level 3 as default
         if not self.initial.get('minimum_certification'):

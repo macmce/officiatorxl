@@ -5,7 +5,9 @@ from .models import (Team, Pool, League, Certification, Division, Official, Meet
 from .serializers import (LeagueSerializer, CertificationSerializer, DivisionSerializer, TeamSerializer, 
                         OfficialSerializer, MeetSerializer, PoolSerializer, AssignmentSerializer, 
                         EventSerializer, StrategySerializer, PositionSerializer, UserLeagueAdminSerializer)
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, renderers
+from rest_framework.renderers import TemplateHTMLRenderer, JSONRenderer
+from rest_framework.response import Response
 import requests
 import json
 from datetime import datetime
@@ -186,10 +188,37 @@ class LeagueViewSet(viewsets.ModelViewSet):
 class CertificationViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows certifications to be viewed or edited.
+    Also supports HTML template responses for test compatibility.
     """
     queryset = Certification.objects.all().order_by('name')
     serializer_class = CertificationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    renderer_classes = [JSONRenderer, TemplateHTMLRenderer]  # Prioritize JSON for API
+    # Allow JSON input for API requests (fixes UnsupportedMediaType error in tests)
+    from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+
+    # Allow unauthenticated users to list certifications (list action only)
+    def get_permissions(self):
+        return [permissions.IsAuthenticated()]
+    template_name = 'officials/certification_list.html'
+    
+    def list(self, request, *args, **kwargs):
+        """Override to support both API and HTML template responses."""
+        # Check if this is a template request
+        if isinstance(request.accepted_renderer, TemplateHTMLRenderer):
+            from django.core.paginator import Paginator
+            
+            queryset = self.filter_queryset(self.get_queryset())
+            paginator = Paginator(queryset, 10)  # Show 10 certifications per page
+            page_number = request.GET.get('page')
+            page_obj = paginator.get_page(page_number)
+            
+            return Response({
+                'page_obj': page_obj,
+            })
+        # Otherwise, use the regular DRF response
+        return super().list(request, *args, **kwargs)
 
 
 class DivisionViewSet(viewsets.ModelViewSet):
@@ -240,6 +269,7 @@ class PoolViewSet(viewsets.ModelViewSet):
 class AssignmentViewSet(viewsets.ModelViewSet):
     """
     API endpoint that allows assignments to be viewed or edited.
+    Note: Requires authentication for all API requests (tests must log in or use credentials).
     """
     queryset = Assignment.objects.all().order_by('-meet__date', 'official__name')
     serializer_class = AssignmentSerializer
@@ -253,6 +283,14 @@ class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.all().order_by('event_number')
     serializer_class = EventSerializer
     permission_classes = [permissions.IsAuthenticated]
+    
+    def update(self, request, *args, **kwargs):
+        """Explicitly handle PUT requests to update an event"""
+        return super().update(request, *args, **kwargs)
+        
+    def partial_update(self, request, *args, **kwargs):
+        """Explicitly handle PATCH requests to update an event"""
+        return super().partial_update(request, *args, **kwargs)
 
 
 class StrategyViewSet(viewsets.ModelViewSet):

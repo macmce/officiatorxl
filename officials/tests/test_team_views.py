@@ -203,10 +203,11 @@ class TeamViewsTest(TestCase):
             'division': self.division.id
         }
         
-        response = self.client.post(reverse('team_create'), team_data)
-        
-        # Should redirect to detail page of new team
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('team_create'), team_data, follow=True)
+    
+        # Expect redirect to team detail page (302 followed to 200)
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse('team_detail', args=[response.context['team'].id]))
         
         # Check that team was created
         new_team = Team.objects.get(name='New Test Team')
@@ -231,10 +232,10 @@ class TeamViewsTest(TestCase):
             'division': self.division.id
         }
         
-        response = self.client.post(reverse('team_update', args=[self.team.id]), updated_data)
-        
-        # Should redirect to detail page
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('team_update', args=[self.team.id]), updated_data, follow=True)
+    
+        # Expect redirect to team detail page (302 followed to 200)
+        self.assertEqual(response.status_code, 200)
         self.assertRedirects(response, reverse('team_detail', args=[self.team.id]))
         
         # Check that team was updated

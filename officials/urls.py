@@ -89,6 +89,8 @@ urlpatterns = [
     path('event-positions/create/', views_event_positions.EventPositionCreateView.as_view(), name='event-position-create'),
     path('event-positions/quick-add/', views_event_positions.EventPositionQuickAddView.as_view(), name='event-position-quick-add'),
     path('event-positions/auto-assign/', views_event_positions.AutoAssignPositionsView.as_view(), name='event-position-auto-assign'),
+    # Alias URL for tests
+    path('auto-assign-positions/', views_event_positions.AutoAssignPositionsView.as_view(), name='auto-assign-positions'),
     path('event-positions/remove-all/', views_event_positions.RemoveAllEventPositionsView.as_view(), name='event-position-remove-all'),
 
     # API endpoints

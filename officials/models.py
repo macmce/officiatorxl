@@ -207,6 +207,12 @@ class Strategy(models.Model):
         help_text="Officiating strategy (Quadrants or Sides)"
     )
     
+    description = models.TextField(
+        null=True, 
+        blank=True,
+        help_text="Description of the strategy"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
