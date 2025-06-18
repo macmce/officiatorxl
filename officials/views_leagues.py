@@ -27,6 +27,9 @@ class LeagueListView(LoginRequiredMixin, FilterView):
         context = super().get_context_data(**kwargs)
         # Check if any filters are active
         context['filters_active'] = any(self.request.GET.get(param) for param in self.request.GET if param != 'page')
+        
+        # Ensure we have page_obj in the context
+        context['page_obj'] = context.get('page_obj', context.get('leagues'))
         return context
 
 @login_required

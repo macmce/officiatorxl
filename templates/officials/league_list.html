@@ -58,6 +58,7 @@
                                     <i class="bi bi-trash me-1"></i>Delete
                                 </a>
                                 {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -79,14 +80,16 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for league in page_obj %}
+                                {% for league in leagues %}
                                     <tr>
                                         <td class="align-middle">
                                             <div class="d-flex align-items-center">
                                                 {% if league.logo %}
-                                                    <img src="{{ league.logo.url }}" alt="{{ league.name }} Logo" class="me-2" style="max-height: 30px; max-width: 30px;">
+                                                    <img src="{{ league.logo.url }}" alt="{{ league.name }} Logo" class="me-2" style="max-height: 30px;">
                                                 {% endif %}
-                                                <span>{{ league.name }}</span>
+                                                <div>
+                                                    <a href="{% url 'league_detail' league.id %}" class="fw-medium mb-0">{{ league.name }}</a>
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="align-middle">{{ league.description|truncatechars:100 }}</td>
@@ -94,15 +97,22 @@
                                         <td class="align-middle">
                                             <div class="btn-group btn-group-sm">
                                                 <a href="{% url 'league_detail' league.id %}" class="btn btn-outline-primary">
-                                                    <i class="bi bi-eye"></i>
+                                                    <i class="bi bi-eye me-1"></i>View
                                                 </a>
                                                 {% if user.is_superuser %}
-                                                    <a href="{% url 'league_update' league.id %}" class="btn btn-outline-secondary">
-                                                        <i class="bi bi-pencil"></i>
-                                                    </a>
+                                                <a href="{% url 'league_update' league.id %}" class="btn btn-outline-secondary">
+                                                    <i class="bi bi-pencil me-1"></i>Edit
+                                                </a>
+                                                <a href="{% url 'league_delete' league.id %}" class="btn btn-outline-danger">
+                                                    <i class="bi bi-trash me-1"></i>Delete
+                                                </a>
                                                 {% endif %}
                                             </div>
                                         </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-3">No leagues found</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -113,42 +123,42 @@
         </div>
 
         <!-- Pagination -->
-        {% if page_obj.has_other_pages %}
+        {% if leagues.paginator.num_pages > 1 %}
             <nav aria-label="Page navigation" class="mt-4">
                 <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
+                    {% if leagues.has_previous %}
                         <li class="page-item">
                             <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1" aria-label="First">
                                 <span aria-hidden="true">&laquo;&laquo;</span>
                             </a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ leagues.previous_page_number }}" aria-label="Previous">
                                 <span aria-hidden="true">&laquo;</span>
                             </a>
                         </li>
                     {% endif %}
-
-                    {% for num in page_obj.paginator.page_range %}
-                        {% if page_obj.number == num %}
+                
+                    {% for num in leagues.paginator.page_range %}
+                        {% if leagues.number == num %}
                             <li class="page-item active">
-                                <a class="page-link" href="#">{{ num }}</a>
+                                <span class="page-link">{{ num }}</span>
                             </li>
-                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        {% elif num > leagues.number|add:'-3' and num < leagues.number|add:'3' %}
                             <li class="page-item">
                                 <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}">{{ num }}</a>
                             </li>
                         {% endif %}
                     {% endfor %}
 
-                    {% if page_obj.has_next %}
+                    {% if leagues.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" aria-label="Next">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ leagues.next_page_number }}" aria-label="Next">
                                 <span aria-hidden="true">&raquo;</span>
                             </a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}" aria-label="Last">
+                            <a class="page-link" href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ leagues.paginator.num_pages }}" aria-label="Last">
                                 <span aria-hidden="true">&raquo;&raquo;</span>
                             </a>
                         </li>
@@ -188,7 +198,7 @@
         const savedView = localStorage.getItem('leagueViewPreference');
         
         function showCardView() {
-            cardView.style.display = 'block';
+            cardView.style.display = 'flex';
             listView.style.display = 'none';
             
             // Update button styling
@@ -196,20 +206,37 @@
             cardViewBtn.classList.remove('btn-outline-secondary');
             listViewBtn.classList.remove('active', 'btn-secondary');
             listViewBtn.classList.add('btn-outline-secondary');
+            
+            // Save preference
+            localStorage.setItem('leagueViewPreference', 'card');
         }
         
         // Apply list view styling and visibility
-        function applyListView() {
+        function showListView() {
             // Show/hide content
             cardView.style.display = 'none';
-            listView.style.display = '';
+            listView.style.display = 'block';
             
             // Update button styling
             listViewBtn.classList.add('active', 'btn-secondary');
             listViewBtn.classList.remove('btn-outline-secondary');
             cardViewBtn.classList.remove('active', 'btn-secondary');
             cardViewBtn.classList.add('btn-outline-secondary');
+            
+            // Save preference
+            localStorage.setItem('leagueViewPreference', 'list');
         }
+        
+        // Set initial view based on saved preference
+        if (savedView === 'list') {
+            showListView();
+        } else {
+            showCardView(); // Default to card view
+        }
+        
+        // Add event listeners for the toggle buttons
+        cardViewBtn.addEventListener('click', showCardView);
+        listViewBtn.addEventListener('click', showListView);
     });
 </script>
 {% endblock %}
