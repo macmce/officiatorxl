@@ -25,7 +25,7 @@ urlpatterns = [
     path('', RedirectView.as_view(pattern_name='dashboard'), name='home'),  # Redirect root to dashboard
     path('users/', include('users.urls')),  # Include user app URLs
     path('officials/', include('officials.urls')),  # Include officials app URLs
-    path('api/v1/officials/', include('officials.api_urls')), # Include officials app API URLs
+    path('api/v1/officials/', include('officials.api_urls', namespace='officials_api')), # Include officials app API URLs
 ]
 
 # Serve static and media files in development
