@@ -253,16 +253,6 @@ class PositionImportForm(forms.Form):
         return file
 
 
-class PoolForm(forms.ModelForm):
-    """Form for creating and updating pools."""
-    class Meta:
-        model = Pool
-        fields = ['name', 'address', 'length', 'units', 'lanes', 'bidirectional']
-        widgets = {
-            'address': forms.Textarea(attrs={'rows': 3}),
-        }
-
-
 # Create a formset for managing pools within a team
 PoolFormSet = inlineformset_factory(
     Team, 
