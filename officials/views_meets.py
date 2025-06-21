@@ -55,7 +55,11 @@ def meet_create_step1(request):
         return redirect('meet_list')
     
     if request.method == 'POST':
+        # Check if name is auto-generated or manually entered
+        auto_generated = request.POST.get('auto_generated_name', 'true') == 'true'
+        
         form = MeetForm(request.POST)
+        form.auto_generated_name = auto_generated
         # First validate the entire form
         if form.is_valid():
             # Now we can safely access form.cleaned_data
@@ -69,6 +73,7 @@ def meet_create_step1(request):
                 'meet_type_display': dict(Meet.MEET_TYPE_CHOICES)[form.cleaned_data['meet_type']],
                 'participating_teams_ids': [team.id for team in form.cleaned_data['participating_teams']],
                 'participating_teams': [team.name for team in form.cleaned_data['participating_teams']],
+                'auto_generated_name': auto_generated, # Store whether name was auto-generated
             }
             
             # Host team is optional for non-dual meets

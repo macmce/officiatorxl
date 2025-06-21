@@ -129,6 +129,7 @@ class Meet(models.Model):
     name = models.CharField(max_length=200)
     date = models.DateField()
     league = models.ForeignKey(League, on_delete=models.CASCADE, related_name='meets')
+    division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name='meets', null=True, blank=True)
     host_team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='hosted_meets')
     pool = models.ForeignKey('Pool', on_delete=models.SET_NULL, null=True, blank=True, related_name='meets')
     participating_teams = models.ManyToManyField(Team, related_name='meets')

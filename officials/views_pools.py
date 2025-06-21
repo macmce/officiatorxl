@@ -40,6 +40,12 @@ def pool_create(request, team_id):
 def pool_update(request, pk):
     """Update an existing pool."""
     pool = get_object_or_404(Pool, pk=pk)
+    
+    # Safety check: ensure pool.team exists
+    if not pool.team:
+        messages.error(request, 'This pool does not have an associated team.')
+        return redirect('pool_list')  # Redirect to a safe location
+    
     team = pool.team
     
     # Check if user has permission to edit this pool
@@ -56,14 +62,20 @@ def pool_update(request, pk):
     else:
         form = PoolForm(instance=pool)
         # Limit team choices to the current team
-        form.fields['team'].queryset = Team.objects.filter(id=team.id)
+        if team:
+            form.fields['team'].queryset = Team.objects.filter(id=team.id)
     
-    return render(request, 'officials/pool_form.html', {
+    context = {
         'form': form,
         'title': f'Update Pool: {pool.name}',
         'pool': pool,
-        'team': team,
-    })
+    }
+    
+    # Only add team to context if it exists
+    if team:
+        context['team'] = team
+    
+    return render(request, 'officials/pool_form.html', context)
 
 
 @login_required

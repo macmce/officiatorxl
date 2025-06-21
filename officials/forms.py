@@ -80,11 +80,39 @@ class MeetForm(forms.ModelForm):
     """Form for creating and updating meets."""
     class Meta:
         model = Meet
-        fields = ['league', 'date', 'host_team', 'pool', 'name', 'meet_type', 'participating_teams']
+        fields = ['league', 'division', 'date', 'host_team', 'pool', 'name', 'meet_type', 'participating_teams']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'meet_type': forms.Select(),
+            'name': forms.TextInput(attrs={'placeholder': 'Enter meet name'}),
         }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add a hidden field to track whether name field is auto-generated
+        self.auto_generated_name = True
+        
+        # Make name field required
+        self.fields['name'].required = True
+        
+        # Set division queryset based on league
+        if self.instance and self.instance.pk and self.instance.league:
+            # Editing existing meet - filter by instance league
+            self.fields['division'].queryset = Division.objects.filter(league=self.instance.league)
+        elif self.data and self.data.get('league'):
+            # Form submission with league data - filter by submitted league
+            try:
+                league_id = int(self.data.get('league'))
+                self.fields['division'].queryset = Division.objects.filter(league_id=league_id)
+            except (ValueError, TypeError):
+                self.fields['division'].queryset = Division.objects.none()
+        else:
+            # New meet form load - start with empty division queryset
+            self.fields['division'].queryset = Division.objects.none()
+        
+        # Set division field properties
+        self.fields['division'].empty_label = "Select a division"
+        self.fields['division'].required = False  # Allow optional division
         
     def clean(self):
         cleaned_data = super().clean()
