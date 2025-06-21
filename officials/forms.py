@@ -76,6 +76,29 @@ class OfficialForm(forms.ModelForm):
         }
 
 
+class PoolSelectWidget(forms.Select):
+    """Custom widget for pool selection that includes address data in options."""
+    
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if value and value != '':
+            try:
+                # Handle ModelChoiceIteratorValue objects
+                if hasattr(value, 'value'):
+                    pool_id = value.value
+                else:
+                    pool_id = value
+                
+                from .models import Pool
+                pool = Pool.objects.get(pk=pool_id)
+                option['attrs']['data-address'] = pool.address or ''
+            except (Pool.DoesNotExist, ValueError, TypeError):
+                option['attrs']['data-address'] = ''
+        else:
+            option['attrs']['data-address'] = ''
+        return option
+
+
 class MeetForm(forms.ModelForm):
     """Form for creating and updating meets."""
     class Meta:
@@ -85,6 +108,7 @@ class MeetForm(forms.ModelForm):
             'date': forms.DateInput(attrs={'type': 'date'}),
             'meet_type': forms.Select(),
             'name': forms.TextInput(attrs={'placeholder': 'Enter meet name'}),
+            'pool': PoolSelectWidget(),
         }
         
     def __init__(self, *args, **kwargs):
