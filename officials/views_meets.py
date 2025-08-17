@@ -75,6 +75,12 @@ def meet_create_step1(request):
                 'participating_teams': [team.name for team in form.cleaned_data['participating_teams']],
                 'auto_generated_name': auto_generated, # Store whether name was auto-generated
             }
+            # Persist division from form, if provided
+            if form.cleaned_data.get('division'):
+                request.session['meet_step1_data']['division_id'] = form.cleaned_data['division'].id
+                request.session['meet_step1_data']['division_name'] = form.cleaned_data['division'].name
+            else:
+                request.session['meet_step1_data']['division_id'] = None
             
             # Host team is optional for non-dual meets
             if form.cleaned_data.get('host_team'):
@@ -221,6 +227,9 @@ def meet_create_step3(request):
                 name=meet_data['name'],
                 meet_type=meet_data['meet_type']
             )
+            # Set division if captured in step 1
+            if meet_data.get('division_id'):
+                meet.division_id = meet_data.get('division_id')
             
             # Set host team if it exists
             if meet_data['host_team_id']:
@@ -304,6 +313,10 @@ def meet_create(request):
                 pool_id=request.POST.get('pool'),
                 meet_type=request.POST.get('meet_type')
             )
+            # Save division if provided
+            division_id = request.POST.get('division')
+            if division_id:
+                meet.division_id = division_id
             # Save strategy if provided (required by form validation)
             strategy_id = request.POST.get('strategy')
             if strategy_id:
@@ -329,13 +342,9 @@ def meet_create(request):
             
             logger.info("Form is valid")
             
-            # Return 200 with template for step 2
-            context = {
-                'form': form,
-                'title': 'Create Meet',
-                'meet': meet,
-            }
-            return render(request, 'officials/meet_form.html', context, status=200)
+            # Redirect to meet detail after successful creation
+            messages.success(request, f'Meet "{meet.name}" created successfully!')
+            return redirect('meet_detail', pk=meet.pk)
         
         except Exception as e:
             # Catch any errors to ensure the view doesn't get interrupted

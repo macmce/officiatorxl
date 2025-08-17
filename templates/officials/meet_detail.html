@@ -30,9 +30,12 @@
                 <div class="card-body">
                     <p><strong>Name:</strong> {{ meet.name }}</p>
                     <p><strong>Date:</strong> {{ meet.date|date:"l, F j, Y" }}</p>
+                    <p><strong>Start Time:</strong> {% if meet.start_time %}{{ meet.start_time|time:"g:i A" }}{% else %}<span class="text-muted">Not specified</span>{% endif %}</p>
                     <p><strong>Meet Type:</strong> {{ meet.get_meet_type_display }}</p>
-                    <p><strong>Host Team:</strong> <a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a></p>
+                    <p><strong>Host Team:</strong> {% if meet.host_team %}<a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a>{% else %}<span class="text-muted">Not specified</span>{% endif %}</p>
                     <p><strong>League:</strong> <a href="{% url 'league_detail' meet.league.id %}">{{ meet.league.name }}</a></p>
+                    <p><strong>Division:</strong> {% if meet.division %}{{ meet.division.name }}{% else %}<span class="text-muted">Not specified</span>{% endif %}</p>
+                    <p><strong>Strategy:</strong> {{ meet.strategy|default:'-' }}</p>
                     
                     {% if meet.pool %}
                         <p><strong>Pool:</strong> {{ meet.pool.name }} ({{ meet.pool.length }} {{ meet.pool.units }}, {{ meet.pool.lanes }} lanes)</p>
@@ -42,26 +45,12 @@
                     {% else %}
                         <p><strong>Pool:</strong> <span class="text-muted">Not specified</span></p>
                     {% endif %}
+
                     
                     {% if meet.weather_forecast %}
-                        <div class="mt-3">
-                            <h6><i class="fas fa-cloud me-2"></i>Weather Forecast</h6>
-                            <div class="d-flex align-items-center">
-                                <div class="me-3">
-                                    <h4>{{ meet.weather_forecast.temperature }}°{{ meet.weather_forecast.units|default:'F' }}</h4>
-                                    <p>{{ meet.weather_forecast.description }}</p>
-                                </div>
-                                <div class="flex-grow-1">
-                                    <ul class="list-group list-group-sm">
-                                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                                            Precipitation
-                                            <span class="badge bg-primary">{{ meet.weather_forecast.precipitation }}%</span>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                        {{ meet.weather_forecast|json_script:"forecast-data" }}
                     {% endif %}
+
                     <p><strong>Officials Assigned:</strong> {{ assignments.count }}</p>
                     
                     <p><strong>Participating Teams:</strong></p>
@@ -84,6 +73,21 @@
         </div>
 
         <div class="col-lg-8">
+            <!-- Weather Forecast moved to right side above assignments -->
+            <div class="card mb-4" id="weatherForecast" style="display: none;">
+                <div class="card-header bg-info text-white d-flex align-items-center">
+                    <i class="fas fa-cloud-sun me-2"></i>
+                    <h5 class="mb-0">Weather Forecast</h5>
+                </div>
+                <div class="card-body" id="weatherContent">
+                    <div class="text-center">
+                        <div class="spinner-border text-info" role="status" id="weatherLoading" style="display: none;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div id="weatherData"></div>
+                    </div>
+                </div>
+            </div>
             <div class="card">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Assignments</h5>
@@ -190,4 +194,96 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const weatherForecast = document.getElementById('weatherForecast');
+        const weatherData = document.getElementById('weatherData');
+        const weatherLoading = document.getElementById('weatherLoading');
+
+        const poolAddress = "{{ meet.pool.address|default:''|escapejs }}";
+        const date = "{{ meet.date|date:'Y-m-d' }}";
+
+        function renderForecast(data) {
+            if (!data) return;
+            const unitsSymbol = data.units === 'imperial' ? 'F' : 'C';
+            const windUnits = data.units === 'imperial' ? 'mph' : 'kph';
+            const high = (data.high ?? data.temp_high ?? data.max_temp ?? data.high_temperature);
+            const html = `
+                <div class="row">
+                    <div class="col-md-4 text-center">
+                        <h1>${data.temperature}°${unitsSymbol}</h1>
+                        <p class="lead">${data.description || ''}</p>
+                    </div>
+                    <div class="col-md-8">
+                        <ul class="list-group">
+                            ${high !== undefined && high !== null && `${'<li class="list-group-item d-flex justify-content-between align-items-center">'}High<span class="badge bg-danger">${high}°${unitsSymbol}</span></li>` || ''}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Chance of Precipitation
+                                <span class="badge bg-primary">${data.precipitation ?? '-'}%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Humidity
+                                <span class="badge bg-secondary">${data.humidity ?? '-'}%</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                Wind
+                                <span class="badge bg-info">${data.wind ?? '-'} ${windUnits}</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>`;
+            weatherData.innerHTML = html;
+        }
+
+        function showCard() {
+            weatherForecast.style.display = 'block';
+            weatherLoading.style.display = 'none';
+        }
+
+        function tryRenderStoredForecast() {
+            const el = document.getElementById('forecast-data');
+            if (!el) return false;
+            try {
+                const data = JSON.parse(el.textContent);
+                showCard();
+                renderForecast(data);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function fetchAndRenderForecast() {
+            if (!poolAddress || !date) {
+                weatherForecast.style.display = 'none';
+                return;
+            }
+            weatherForecast.style.display = 'block';
+            weatherLoading.style.display = 'block';
+            weatherData.innerHTML = '';
+            fetch(`/officials/api/weather/?address=${encodeURIComponent(poolAddress)}&date=${date}`)
+                .then(resp => resp.json())
+                .then(data => {
+                    weatherLoading.style.display = 'none';
+                    if (data && !data.error) {
+                        renderForecast(data);
+                    } else {
+                        weatherData.innerHTML = `<div class="alert alert-warning">${data.error || 'No weather data available.'}</div>`;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching weather:', err);
+                    weatherLoading.style.display = 'none';
+                    weatherData.innerHTML = '<div class="alert alert-danger">Error fetching weather forecast. Please try again later.</div>';
+                });
+        }
+
+        if (!tryRenderStoredForecast()) {
+            fetchAndRenderForecast();
+        }
+    });
+</script>
 {% endblock %}
