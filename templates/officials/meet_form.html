@@ -257,6 +257,35 @@
             });
         }
 
+        // Pick preferred temperature: 1 PM reading if available, else daily high, else current temperature
+        function pickPreferredTemp(data) {
+            const explicit1pm = (data.forecast_1pm ?? data.temperature_1pm ?? data.temp_1pm);
+            if (explicit1pm !== undefined && explicit1pm !== null) {
+                return { value: explicit1pm, label: '1 PM', source: '1pm' };
+            }
+            const hourly = Array.isArray(data.hourly) ? data.hourly : (Array.isArray(data.hourly_forecast) ? data.hourly_forecast : null);
+            if (hourly) {
+                const match = hourly.find(h => {
+                    const t = (h.time || h.hour || h.timestamp || '').toString();
+                    return /(^|\b)13(:?\:00)?(\b|$)/.test(t) || /1\s*pm/i.test(t);
+                });
+                const tempKey = ['temp', 'temperature', 'temp_f', 'temp_c'].find(k => match && match[k] !== undefined && match[k] !== null);
+                if (match && tempKey) {
+                    return { value: match[tempKey], label: '1 PM', source: '1pm' };
+                }
+            }
+            if (data.by_hour && (data.by_hour['13'] || data.by_hour['13:00'])) {
+                const h = data.by_hour['13'] || data.by_hour['13:00'];
+                const tempKey = ['temp', 'temperature', 'temp_f', 'temp_c'].find(k => h && h[k] !== undefined && h[k] !== null);
+                if (tempKey) return { value: h[tempKey], label: '1 PM', source: '1pm' };
+            }
+            const high = (data.high ?? data.temp_high ?? data.max_temp ?? data.high_temperature);
+            if (high !== undefined && high !== null) {
+                return { value: high, label: 'High', source: 'high' };
+            }
+            return { value: data.temperature, label: 'Current', source: 'current' };
+        }
+
         // Keep hidden select in sync with visible checkboxes
         function syncParticipatingTeamsSelect() {
             const selectedIds = getSelectedTeamIds();
@@ -301,26 +330,43 @@
                         return;
                     }
                     
-                    // Display the weather forecast
+                    // Display the weather forecast with preference for 1 PM or High
+                    const unitsSymbol = data.units === 'imperial' ? 'F' : 'C';
+                    const windUnits = data.units === 'imperial' ? 'mph' : 'kph';
+                    const high = (data.high ?? data.temp_high ?? data.max_temp ?? data.high_temperature);
+                    const preferred = pickPreferredTemp(data);
+                    // Build a date/time label using the selected date input or data payload
+                    const dataDate = (data.date || data.valid_date || data.forecast_date || dateInput.value);
+                    let whenLabel = '';
+                    if (preferred.source === '1pm') {
+                        whenLabel = `Forecast for ${dataDate} at 1 PM`;
+                    } else if (preferred.source === 'high') {
+                        whenLabel = `Forecast for ${dataDate} (Daily High)`;
+                    } else {
+                        whenLabel = `Forecast for ${dataDate} (Current)`;
+                    }
                     let weatherHtml = `
                         <div class="row">
                             <div class="col-md-4 text-center">
-                                <h1>${data.temperature}°${data.units === 'imperial' ? 'F' : 'C'}</h1>
-                                <p class="lead">${data.description}</p>
+                                <h1>${preferred.value}°${unitsSymbol}</h1>
+                                <div><span class="badge bg-dark">${preferred.label}</span></div>
+                                <div class="text-muted small mt-1">${whenLabel}</div>
+                                <p class="lead">${data.description || ''}</p>
                             </div>
                             <div class="col-md-8">
                                 <ul class="list-group">
+                                    ${high !== undefined && high !== null ? `<li class="list-group-item d-flex justify-content-between align-items-center">High<span class="badge bg-danger">${high}°${unitsSymbol}</span></li>` : ''}
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Chance of Precipitation
-                                        <span class="badge bg-primary">${data.precipitation}%</span>
+                                        <span class="badge bg-primary">${(data.precipitation ?? '-') + '%'}</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Humidity
-                                        <span class="badge bg-secondary">${data.humidity}%</span>
+                                        <span class="badge bg-secondary">${(data.humidity ?? '-') + '%'}</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Wind
-                                        <span class="badge bg-info">${data.wind} mph</span>
+                                        <span class="badge bg-info">${data.wind ?? '-'} ${windUnits}</span>
                                     </li>
                                 </ul>
                             </div>

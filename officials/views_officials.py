@@ -5,9 +5,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse
 from django.core.paginator import Paginator
+from django.db.models import Q
 from .models import Official, Team, Certification
 from .forms import OfficialForm, CertificationForm
-from officials.models import Certification
 
 logger = logging.getLogger(__name__)
 
@@ -209,14 +209,35 @@ def certification_delete(request, pk):
 def official_list(request):
     """Display list of officials that the user has access to."""
     user_leagues = request.user.leagues.all()
+    # Base queryset limited by user's leagues
     officials = Official.objects.filter(team__division__league__in=user_leagues).order_by('name')
-    
+
+    # Build filter option lists
+    teams = Team.objects.filter(division__league__in=user_leagues).order_by('name')
+    certifications = Certification.objects.all().order_by('level', 'name')
+
+    # Apply filters from GET params
+    search_q = request.GET.get('search')
+    team_id = request.GET.get('team')
+    cert_id = request.GET.get('certification')
+
+    if search_q:
+        officials = officials.filter(Q(name__icontains=search_q) | Q(email__icontains=search_q))
+
+    if team_id:
+        officials = officials.filter(team_id=team_id)
+
+    if cert_id:
+        officials = officials.filter(certification_id=cert_id)
+
     paginator = Paginator(officials, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
     return render(request, 'officials/official_list.html', {
         'page_obj': page_obj,
+        'teams': teams,
+        'certifications': certifications,
     })
 
 
