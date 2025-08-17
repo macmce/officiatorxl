@@ -60,8 +60,13 @@
                             </div>
                         </div>
                         
-                        <!-- The participating_teams field is a ManyToManyField and should be handled appropriately by the form -->
-                        {{ form.participating_teams|as_crispy_field }}
+                        <!-- Participating Teams as checkboxes (replaces multi-select). Keep original select hidden for form submission. -->
+                        <div class="mb-3">
+                            <label class="form-label">Participating Teams</label>
+                            <div id="participating-teams-checkboxes" class="row g-2"></div>
+                            <div class="form-text">For Dual meets, select exactly 2 teams. For Divisional/Invitational, select more than 2.</div>
+                        </div>
+                        <div style="display:none">{{ form.participating_teams }}</div>
                         
                         <div class="row" id="host-team-container">
                             <div class="col-md-12">
@@ -131,7 +136,8 @@
         const dateInput = document.getElementById('id_date');
         const hostTeamSelect = document.getElementById('id_host_team');
         const meetTypeSelect = document.getElementById('id_meet_type');
-        const participatingTeamsSelect = document.getElementById('id_participating_teams');
+        const participatingTeamsSelect = document.getElementById('id_participating_teams'); // hidden
+        const participatingTeamsContainer = document.getElementById('participating-teams-checkboxes');
         const leagueSelect = document.getElementById('id_league');
         const divisionSelect = document.getElementById('id_division');
         const nameInput = document.getElementById('id_name');
@@ -146,6 +152,20 @@
         const hostTeamContainer = document.getElementById('host-team-container');
         const hostTeamValidationAlert = document.getElementById('host-team-validation-alert');
         const hostTeamValidationMessage = document.getElementById('host-team-validation-message');
+
+        // Auto-name helper
+        function updateAutoName() {
+            // Only set if blank or previously autofilled
+            const shouldSet = !nameInput.value || nameInput.dataset.autofilled === 'true';
+            if (!shouldSet) return;
+            if (!poolSelect.value || !dateInput.value || !meetTypeSelect.value) return;
+            const meetTypeText = (meetTypeSelect.options[meetTypeSelect.selectedIndex]?.textContent || meetTypeSelect.value).trim();
+            const poolName = (poolSelect.options[poolSelect.selectedIndex]?.textContent || '').trim();
+            const dateText = dateInput.value; // YYYY-MM-DD
+            const built = `${meetTypeText} ${dateText} ${poolName}`;
+            nameInput.value = built;
+            nameInput.dataset.autofilled = 'true';
+        }
         
         // Initialize host team field based on current meet type
         updateHostTeamField();
@@ -198,7 +218,7 @@
             if (meetTypeSelect.value === 'dual') return;
             
             // Gather selected team IDs
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions).map(o => o.value).filter(Boolean);
+            const selectedTeams = getSelectedTeamIds();
             
             // Clear current options except the empty one
             const emptyOption = poolSelect.options[0];
@@ -229,6 +249,14 @@
             
             Promise.all(promises).then(() => {
                 // If a pool is already selected and present, keep it; else no-op
+            });
+        }
+
+        // Keep hidden select in sync with visible checkboxes
+        function syncParticipatingTeamsSelect() {
+            const selectedIds = getSelectedTeamIds();
+            Array.from(participatingTeamsSelect.options).forEach(opt => {
+                opt.selected = selectedIds.includes(opt.value);
             });
         }
         
@@ -355,30 +383,64 @@
                 });
         }
         
-        // Load teams for the selected division
+        // Load teams for the selected division and render as checkboxes
         function loadTeamsForDivision() {
             const divisionId = divisionSelect.value;
             if (!divisionId) {
                 // Clear teams if no division selected
                 participatingTeamsSelect.innerHTML = '';
+                participatingTeamsContainer.innerHTML = '';
                 return;
             }
             
-            // Clear current team options
+            // Clear current team options and checkboxes
             participatingTeamsSelect.innerHTML = '';
+            participatingTeamsContainer.innerHTML = '';
             
             // Fetch teams for the selected division
             fetch(`/officials/api/divisions/${divisionId}/teams/`)
                 .then(response => response.json())
                 .then(teams => {
-                    // Add team options
+                    // Build hidden select options and visible checkboxes
                     teams.forEach(team => {
+                        // Hidden select option
                         const option = document.createElement('option');
                         option.value = team.id;
                         option.textContent = team.name;
                         participatingTeamsSelect.appendChild(option);
+                        
+                        // Visible checkbox
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6';
+                        const formCheck = document.createElement('div');
+                        formCheck.className = 'form-check';
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.className = 'form-check-input team-checkbox';
+                        input.id = `team_${team.id}`;
+                        input.value = team.id;
+                        const label = document.createElement('label');
+                        label.className = 'form-check-label';
+                        label.setAttribute('for', input.id);
+                        label.textContent = team.name;
+                        formCheck.appendChild(input);
+                        formCheck.appendChild(label);
+                        col.appendChild(formCheck);
+                        participatingTeamsContainer.appendChild(col);
                     });
-                    
+
+                    // Pre-check based on hidden select's existing selected options (e.g., edit mode)
+                    const preselected = Array.from(participatingTeamsSelect.options).filter(o => o.selected).map(o => o.value);
+                    if (preselected.length) {
+                        preselected.forEach(id => {
+                            const cb = document.getElementById(`team_${id}`);
+                            if (cb) cb.checked = true;
+                        });
+                    }
+
+                    // Sync hidden select selections from checkboxes
+                    syncParticipatingTeamsSelect();
+
                     // Re-validate team count after updating options
                     validateTeamCount();
                 })
@@ -388,24 +450,29 @@
         }
         
         // Update host team dropdown to only show participating teams
+        function getSelectedTeamIds() {
+            return Array.from(document.querySelectorAll('#participating-teams-checkboxes .team-checkbox:checked')).map(cb => cb.value);
+        }
+
         function updateHostTeamOptions() {
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
+            const selectedTeamIds = getSelectedTeamIds();
             
             // Clear current host team options
             hostTeamSelect.innerHTML = '<option value="">---------</option>';
             
             // Add options for each participating team
-            selectedTeams.forEach(option => {
+            selectedTeamIds.forEach(id => {
                 const hostOption = document.createElement('option');
-                hostOption.value = option.value;
-                hostOption.textContent = option.textContent;
+                hostOption.value = id;
+                // Find label text from checkbox label
+                const label = document.querySelector(`#team_${id} + label`);
+                hostOption.textContent = label ? label.textContent : id;
                 hostTeamSelect.appendChild(hostOption);
             });
             
             // If current host team is not in participating teams, clear it
             const currentHostTeam = hostTeamSelect.value;
-            const participatingTeamIds = selectedTeams.map(option => option.value);
-            if (currentHostTeam && !participatingTeamIds.includes(currentHostTeam)) {
+            if (currentHostTeam && !selectedTeamIds.includes(currentHostTeam)) {
                 hostTeamSelect.value = '';
                 // Clear pools since host team was cleared
                 poolSelect.innerHTML = '<option value="">---------</option>';
@@ -418,7 +485,7 @@
         // Validation for meet type and participating teams
         function validateTeamCount() {
             const meetType = meetTypeSelect.value;
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions).length;
+            const selectedTeams = getSelectedTeamIds().length;
             
             if (meetType === 'dual' && selectedTeams !== 2) {
                 teamValidationMessage.textContent = 'Dual meets must have exactly 2 participating teams.';
@@ -436,13 +503,13 @@
         
         function validateHostTeam() {
             const meetType = meetTypeSelect.value;
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
+            const selectedTeamIds = getSelectedTeamIds();
             const hostTeamId = hostTeamSelect.value;
             
             if (meetType === 'dual') {
                 // For dual meets, host team must be one of the participating teams
                 if (hostTeamId) {
-                    const isParticipating = Array.from(selectedTeams).some(team => team.value === hostTeamId);
+                    const isParticipating = selectedTeamIds.includes(hostTeamId);
                     if (!isParticipating) {
                         hostTeamValidationMessage.textContent = 'Host team must be one of the participating teams.';
                         hostTeamValidationAlert.style.display = 'block';
@@ -479,8 +546,7 @@
                 hostTeamSelect.required = true;
                 
                 // Filter host team options to only include participating teams
-                const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
-                const selectedTeamIds = selectedTeams.map(option => option.value);
+                const selectedTeamIds = getSelectedTeamIds();
                 
                 Array.from(hostTeamSelect.options).forEach(option => {
                     if (option.value === '') return; // Skip empty option
@@ -504,11 +570,18 @@
             loadPoolsForTeam();
             validateHostTeam();
         });
-        poolSelect.addEventListener('change', getWeatherForecast);
-        dateInput.addEventListener('change', getWeatherForecast);
+        poolSelect.addEventListener('change', function() {
+            getWeatherForecast();
+            updateAutoName();
+        });
+        dateInput.addEventListener('change', function() {
+            getWeatherForecast();
+            updateAutoName();
+        });
         meetTypeSelect.addEventListener('change', function() {
             updateHostTeamField();
             validateTeamCount();
+            updateAutoName();
             // Reload pools based on meet type
             if (meetTypeSelect.value === 'dual') {
                 loadPoolsForTeam();
@@ -516,12 +589,25 @@
                 loadPoolsForParticipatingTeams();
             }
         });
-        participatingTeamsSelect.addEventListener('change', function() {
-            updateHostTeamOptions();
-            validateTeamCount();
-            // For non-dual meets, repopulate pools from selected teams
-            if (meetTypeSelect.value !== 'dual') {
-                loadPoolsForParticipatingTeams();
+        // Delegate checkbox change events
+        participatingTeamsContainer.addEventListener('change', function(e) {
+            if (e.target && e.target.classList.contains('team-checkbox')) {
+                // Enforce dual meet max 2 selection
+                if (meetTypeSelect.value === 'dual') {
+                    const checked = getSelectedTeamIds();
+                    if (checked.length > 2) {
+                        e.target.checked = false;
+                        teamValidationMessage.textContent = 'Dual meets must have exactly 2 participating teams.';
+                        teamValidationAlert.style.display = 'block';
+                        return;
+                    }
+                }
+                syncParticipatingTeamsSelect();
+                updateHostTeamOptions();
+                validateTeamCount();
+                if (meetTypeSelect.value !== 'dual') {
+                    loadPoolsForParticipatingTeams();
+                }
             }
         });
         leagueSelect.addEventListener('change', loadDivisionsForLeague);
@@ -545,7 +631,7 @@
         }
         
         // If non-dual and participating teams preselected, load their pools
-        if (meetTypeSelect.value !== 'dual' && participatingTeamsSelect.selectedOptions.length > 0) {
+        if (meetTypeSelect.value !== 'dual' && getSelectedTeamIds().length > 0) {
             loadPoolsForParticipatingTeams();
         }
 
@@ -561,9 +647,16 @@
         
         // Add event listener to form submission
         document.getElementById('meetForm').addEventListener('submit', function(event) {
+            // Ensure hidden select reflects current checkbox state
+            syncParticipatingTeamsSelect();
             if (!validateTeamCount()) {
                 event.preventDefault();
             }
+        });
+
+        // If user types in the name, stop auto-updates
+        nameInput.addEventListener('input', function() {
+            nameInput.dataset.autofilled = 'false';
         });
     });
 </script>
