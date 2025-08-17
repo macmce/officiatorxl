@@ -137,6 +137,7 @@ class Meet(models.Model):
     participating_teams = models.ManyToManyField(Team, related_name='meets')
     meet_type = models.CharField(max_length=20, choices=MEET_TYPE_CHOICES, default='dual')
     weather_forecast = models.JSONField(null=True, blank=True)
+    strategy = models.ForeignKey('Strategy', on_delete=models.SET_NULL, null=True, blank=True, related_name='meets')
     
     def __str__(self):
         return f"{self.name} - {self.date}"

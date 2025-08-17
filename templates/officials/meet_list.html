@@ -93,7 +93,7 @@
                                 <strong>Start Time:</strong> {{ meet.start_time|time:"g:i A" }}
                             </p>
                             <p>
-                                <strong>League:</strong> {{ meet.league.name }}
+                                <strong>Strategy:</strong> {{ meet.strategy|default:'-' }}
                             </p>
                             
                             <p>
@@ -134,7 +134,7 @@
                         <th>Start Time</th>
                         <th>Host Team</th>
                         <th>Pool</th>
-                        <th>League</th>
+                        <th>Strategy</th>
                         <th>Officials</th>
                         <th>Teams</th>
                         <th>Actions</th>
@@ -148,7 +148,7 @@
                             <td>{{ meet.start_time|time:"g:i A" }}</td>
                             <td><a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a></td>
                             <td>{{ meet.pool.name|default:'-' }}</td>
-                            <td>{{ meet.league.name }}</td>
+                            <td>{{ meet.strategy|default:'-' }}</td>
                             <td>{{ meet.assignment_count|default:0 }}</td>
                             <td>{{ meet.participating_teams.count }}</td>
                             <td>

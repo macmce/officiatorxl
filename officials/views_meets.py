@@ -285,6 +285,15 @@ def meet_create(request):
         logger.info(f"POST data: {request.POST}")
         
         try:
+            # Validate the form first to enforce required fields like strategy
+            form = MeetForm(request.POST)
+            if not form.is_valid():
+                logger.warning(f"Form errors: {form.errors}")
+                return render(request, 'officials/meet_form.html', {
+                    'form': form,
+                    'title': 'Create Meet',
+                }, status=200)
+            
             # Skip form validation and create Meet directly
             # This guarantees persistence without relying on form saving behavior
             meet = Meet(
@@ -295,6 +304,10 @@ def meet_create(request):
                 pool_id=request.POST.get('pool'),
                 meet_type=request.POST.get('meet_type')
             )
+            # Save strategy if provided (required by form validation)
+            strategy_id = request.POST.get('strategy')
+            if strategy_id:
+                meet.strategy_id = strategy_id
             
             # Force save
             meet.save()
@@ -314,17 +327,12 @@ def meet_create(request):
             except Meet.DoesNotExist:
                 logger.error("ERROR: Meet not found after save!")
             
-            # Also process form for proper rendering
-            form = MeetForm(request.POST)
-            if form.is_valid():
-                logger.info("Form is valid")
-            else:
-                logger.warning(f"Form errors: {form.errors} - but Meet still created directly")
+            logger.info("Form is valid")
             
             # Return 200 with template for step 2
             context = {
-                'form': form if form.is_valid() else None,
-                'title': 'Create Meet - Step 2',
+                'form': form,
+                'title': 'Create Meet',
                 'meet': meet,
             }
             return render(request, 'officials/meet_form.html', context, status=200)

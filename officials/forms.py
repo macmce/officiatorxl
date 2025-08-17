@@ -104,13 +104,14 @@ class MeetForm(forms.ModelForm):
     """Form for creating and updating meets."""
     class Meta:
         model = Meet
-        fields = ['league', 'division', 'date', 'start_time', 'host_team', 'pool', 'name', 'meet_type', 'participating_teams']
+        fields = ['league', 'division', 'date', 'start_time', 'host_team', 'pool', 'name', 'meet_type', 'strategy', 'participating_teams']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start_time': forms.TimeInput(attrs={'type': 'time'}),
             'meet_type': forms.Select(),
             'name': forms.TextInput(attrs={'placeholder': 'Enter meet name'}),
             'pool': PoolSelectWidget(),
+            'strategy': forms.Select(attrs={'class': 'form-select'}),
         }
         
     def __init__(self, *args, **kwargs):
@@ -120,6 +121,15 @@ class MeetForm(forms.ModelForm):
         
         # Make name field required
         self.fields['name'].required = True
+
+        # Strategy field setup
+        self.fields['strategy'].queryset = Strategy.objects.all()
+        self.fields['strategy'].required = True
+        # Do not allow an empty selection in the dropdown
+        try:
+            self.fields['strategy'].empty_label = None
+        except Exception:
+            pass
         
         # If only one league exists and none provided, preload it
         if not self.data.get('league') and not getattr(self.instance, 'league_id', None):
