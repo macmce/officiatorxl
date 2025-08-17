@@ -38,30 +38,21 @@
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-12">
+                            <div class="col-md-6">
                                 {{ form.date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.start_time|as_crispy_field }}
                             </div>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-12">
-                                {{ form.pool|as_crispy_field }}
+                                {# pool moved below host team #}
                             </div>
                         </div>
                         
-                        <div class="card mb-3" id="weatherForecast" style="display: none;">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="mb-0">Weather Forecast</h5>
-                            </div>
-                            <div class="card-body" id="weatherContent">
-                                <div class="text-center">
-                                    <div class="spinner-border text-info" role="status" id="weatherLoading" style="display: none;">
-                                        <span class="visually-hidden">Loading...</span>
-                                    </div>
-                                    <div id="weatherData"></div>
-                                </div>
-                            </div>
-                        </div>
+                        
                         
                         <div class="row">
                             <div class="col-md-12">
@@ -75,6 +66,28 @@
                         <div class="row" id="host-team-container">
                             <div class="col-md-12">
                                 {{ form.host_team|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        {# Moved pool field to be after host team and before meet name #}
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.pool|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <!-- Weather Forecast moved to follow the pool field -->
+                        <div class="card mb-3" id="weatherForecast" style="display: none;">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">Weather Forecast</h5>
+                            </div>
+                            <div class="card-body" id="weatherContent">
+                                <div class="text-center">
+                                    <div class="spinner-border text-info" role="status" id="weatherLoading" style="display: none;">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <div id="weatherData"></div>
+                                </div>
                             </div>
                         </div>
                         
@@ -149,21 +162,74 @@
             // Fetch pools for the selected team
             fetch(`/officials/api/teams/${hostTeamSelect.value}/pools/`)
                 .then(response => response.json())
-                .then(pools => {
-                    pools.forEach(pool => {
+                .then(data => {
+                    // Add new options
+                    data.forEach(pool => {
                         const option = document.createElement('option');
                         option.value = pool.id;
                         option.textContent = pool.name;
-                        option.dataset.address = pool.address;
+                        option.dataset.address = pool.address || '';
                         poolSelect.appendChild(option);
                     });
-                    
-                    // If we're editing and a pool is already selected, get its weather
-                    if (poolSelect.value) {
+
+                    // Re-select previously selected pool if still available
+                    const previouslySelected = poolSelect.getAttribute('data-selected');
+                    if (previouslySelected) {
+                        poolSelect.value = previouslySelected;
+                        poolSelect.removeAttribute('data-selected');
                         getWeatherForecast();
+                    }
+
+                    // If exactly one pool is available, auto-select it
+                    if (!poolSelect.value) {
+                        const options = Array.from(poolSelect.options).filter(o => o.value);
+                        if (options.length === 1) {
+                            poolSelect.value = options[0].value;
+                            poolSelect.dispatchEvent(new Event('change'));
+                        }
                     }
                 })
                 .catch(error => console.error('Error loading pools:', error));
+        }
+        
+        // Function to load pools for NON-dual meets from selected participating teams
+        function loadPoolsForParticipatingTeams() {
+            // Only applies to non-dual
+            if (meetTypeSelect.value === 'dual') return;
+            
+            // Gather selected team IDs
+            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions).map(o => o.value).filter(Boolean);
+            
+            // Clear current options except the empty one
+            const emptyOption = poolSelect.options[0];
+            poolSelect.innerHTML = '';
+            poolSelect.appendChild(emptyOption);
+            
+            if (selectedTeams.length === 0) {
+                return;
+            }
+            
+            const seen = new Set();
+            const promises = selectedTeams.map(teamId =>
+                fetch(`/officials/api/teams/${teamId}/pools/`)
+                    .then(r => r.json())
+                    .then(pools => {
+                        pools.forEach(pool => {
+                            if (seen.has(pool.id)) return;
+                            seen.add(pool.id);
+                            const option = document.createElement('option');
+                            option.value = pool.id;
+                            option.textContent = pool.name;
+                            option.dataset.address = pool.address || '';
+                            poolSelect.appendChild(option);
+                        });
+                    })
+                    .catch(err => console.error('Error loading pools for team', teamId, err))
+            );
+            
+            Promise.all(promises).then(() => {
+                // If a pool is already selected and present, keep it; else no-op
+            });
         }
         
         // Function to get weather forecast for the selected pool and date
@@ -443,10 +509,20 @@
         meetTypeSelect.addEventListener('change', function() {
             updateHostTeamField();
             validateTeamCount();
+            // Reload pools based on meet type
+            if (meetTypeSelect.value === 'dual') {
+                loadPoolsForTeam();
+            } else {
+                loadPoolsForParticipatingTeams();
+            }
         });
         participatingTeamsSelect.addEventListener('change', function() {
             updateHostTeamOptions();
             validateTeamCount();
+            // For non-dual meets, repopulate pools from selected teams
+            if (meetTypeSelect.value !== 'dual') {
+                loadPoolsForParticipatingTeams();
+            }
         });
         leagueSelect.addEventListener('change', loadDivisionsForLeague);
         divisionSelect.addEventListener('change', loadTeamsForDivision);
@@ -468,6 +544,11 @@
             loadPoolsForTeam();
         }
         
+        // If non-dual and participating teams preselected, load their pools
+        if (meetTypeSelect.value !== 'dual' && participatingTeamsSelect.selectedOptions.length > 0) {
+            loadPoolsForParticipatingTeams();
+        }
+
         // Load divisions if league is already selected (e.g. when editing)
         if (leagueSelect.value) {
             loadDivisionsForLeague();

@@ -1,4 +1,5 @@
 from django import forms
+import datetime
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory, modelformset_factory
 
@@ -103,9 +104,10 @@ class MeetForm(forms.ModelForm):
     """Form for creating and updating meets."""
     class Meta:
         model = Meet
-        fields = ['league', 'division', 'date', 'host_team', 'pool', 'name', 'meet_type', 'participating_teams']
+        fields = ['league', 'division', 'date', 'start_time', 'host_team', 'pool', 'name', 'meet_type', 'participating_teams']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time'}),
             'meet_type': forms.Select(),
             'name': forms.TextInput(attrs={'placeholder': 'Enter meet name'}),
             'pool': PoolSelectWidget(),
@@ -118,6 +120,15 @@ class MeetForm(forms.ModelForm):
         
         # Make name field required
         self.fields['name'].required = True
+        
+        # If only one league exists and none provided, preload it
+        if not self.data.get('league') and not getattr(self.instance, 'league_id', None):
+            league_qs = League.objects.all()
+            if league_qs.count() == 1:
+                only_league = league_qs.first()
+                self.initial['league'] = only_league.id
+                # Set division queryset to this league since league is preselected
+                self.fields['division'].queryset = Division.objects.filter(league=only_league)
         
         # Set division queryset based on league
         if self.instance and self.instance.pk and self.instance.league:
@@ -137,6 +148,20 @@ class MeetForm(forms.ModelForm):
         # Set division field properties
         self.fields['division'].empty_label = "Select a division"
         self.fields['division'].required = False  # Allow optional division
+        
+        # Default start time to 08:30 if not provided
+        if not self.initial.get('start_time') and not self.data.get('start_time'):
+            self.fields['start_time'].initial = datetime.time(8, 30)
+        
+        # Default date to the next Saturday if not provided
+        if not self.initial.get('date') and not self.data.get('date'):
+            today = datetime.date.today()
+            # Saturday = 5 (Mon=0..Sun=6)
+            days_ahead = (5 - today.weekday()) % 7
+            if days_ahead == 0:
+                days_ahead = 7
+            next_saturday = today + datetime.timedelta(days=days_ahead)
+            self.fields['date'].initial = next_saturday
         
     def clean(self):
         cleaned_data = super().clean()

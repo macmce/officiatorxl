@@ -120,34 +120,33 @@ def meet_create_step2(request):
     
     # Create a partial form for step 2 (pool selection)
     if request.method == 'POST':
-        # Create a form and validate it
-        form = MeetForm(request.POST)
+        # Do not validate the entire MeetForm here; only process the pool field
+        pool_id = request.POST.get('pool')
+        pool = None
+        if pool_id:
+            try:
+                pool = Pool.objects.get(id=pool_id)
+            except Pool.DoesNotExist:
+                messages.error(request, 'Selected pool does not exist.')
+                # fall through to render the form again
         
-        # We can perform a partial validation for just the pool field
-        # But first we need to ensure the form has been validated
-        if form.is_valid() or (hasattr(form, 'cleaned_data') and 'pool' in form.cleaned_data):
-            pool = form.cleaned_data.get('pool')
-            
-            # Store step 2 data in session
-            request.session['meet_step2_data'] = {
-                'pool_id': pool.id if pool else None,
-                'pool': pool.name if pool else None,
+        # Store step 2 data in session regardless (pool is optional)
+        request.session['meet_step2_data'] = {
+            'pool_id': pool.id if pool else None,
+            'pool': pool.name if pool else None,
+        }
+        
+        if pool:
+            request.session['meet_step2_data']['pool_details'] = {
+                'address': pool.address,
+                'length': pool.length,
+                'units': pool.units,
+                'lanes': pool.lanes,
+                'bidirectional': pool.bidirectional,
             }
-            
-            # If pool is selected, store additional pool details
-            if pool:
-                request.session['meet_step2_data']['pool_details'] = {
-                    'address': pool.address,
-                    'length': pool.length,
-                    'units': pool.units,
-                    'lanes': pool.lanes,
-                    'bidirectional': pool.bidirectional,
-                }
-            
-            # TODO: If weather API is implemented, store weather data here
-            
-            # Proceed to step 3
-            return redirect('meet_create_step3')
+        
+        # Proceed to step 3
+        return redirect('meet_create_step3')
     else:
         # Initialize the form for step 2
         form = MeetForm()
@@ -207,6 +206,7 @@ def meet_create_step3(request):
         # Time to save the meet
         try:
             # Get the objects from their IDs
+            logger.info("[Step3] meet_data: %s", meet_data)
             league = League.objects.get(id=meet_data['league_id'])
             
             # Check if user has permission to add meet to this league
@@ -229,11 +229,13 @@ def meet_create_step3(request):
             
             # Set pool if it exists
             if meet_data.get('pool_id'):
+                logger.info("[Step3] Setting pool_id=%s", meet_data.get('pool_id'))
                 pool = Pool.objects.get(id=meet_data['pool_id'])
                 meet.pool = pool
             
             # Save the meet
             meet.save()
+            logger.info("[Step3] Saved Meet id=%s pool_id=%s", meet.id, meet.pool_id)
             
             # Add participating teams
             participating_teams = Team.objects.filter(id__in=meet_data['participating_teams_ids'])

@@ -1,4 +1,5 @@
 from django.db import models
+import datetime
 from django.conf import settings
 from django.utils import timezone
 from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
@@ -128,6 +129,7 @@ class Meet(models.Model):
     
     name = models.CharField(max_length=200)
     date = models.DateField()
+    start_time = models.TimeField(default=datetime.time(8, 30))
     league = models.ForeignKey(League, on_delete=models.CASCADE, related_name='meets')
     division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name='meets', null=True, blank=True)
     host_team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='hosted_meets')

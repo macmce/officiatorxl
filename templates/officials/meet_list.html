@@ -87,7 +87,7 @@
                                 <a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a>
                             </p>
                             <p>
-                                <strong>Location:</strong> {{ meet.location }}
+                                <strong>Pool:</strong> {{ meet.pool.name|default:'-' }}
                             </p>
                             <p>
                                 <strong>Start Time:</strong> {{ meet.start_time|time:"g:i A" }}
@@ -131,9 +131,9 @@
                     <tr>
                         <th>Name</th>
                         <th>Date</th>
-                        <th>Host Team</th>
-                        <th>Location</th>
                         <th>Start Time</th>
+                        <th>Host Team</th>
+                        <th>Pool</th>
                         <th>League</th>
                         <th>Officials</th>
                         <th>Teams</th>
@@ -145,9 +145,9 @@
                         <tr {% if meet.date < today %}class="table-secondary"{% elif meet.date == today %}class="table-primary"{% endif %}>
                             <td>{{ meet.name }}</td>
                             <td>{{ meet.date|date:"M j, Y" }}</td>
-                            <td><a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a></td>
-                            <td>{{ meet.location }}</td>
                             <td>{{ meet.start_time|time:"g:i A" }}</td>
+                            <td><a href="{% url 'team_detail' meet.host_team.id %}">{{ meet.host_team.name }}</a></td>
+                            <td>{{ meet.pool.name|default:'-' }}</td>
                             <td>{{ meet.league.name }}</td>
                             <td>{{ meet.assignment_count|default:0 }}</td>
                             <td>{{ meet.participating_teams.count }}</td>
