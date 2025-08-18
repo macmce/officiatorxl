@@ -28,6 +28,13 @@
           <p><strong>Meet Type:</strong> {{ meet.get_meet_type_display }}</p>
           <p><strong>Host Team:</strong> {% if meet.host_team %}{{ meet.host_team.name }}{% else %}<span class="text-muted">Not specified</span>{% endif %}</p>
           <p><strong>Strategy:</strong> {{ meet.strategy|default:'-' }}</p>
+          <p><strong>Meet Referee:</strong>
+            {% if meet_referee %}
+              {{ meet_referee.name }}
+            {% else %}
+              <span class="text-muted">Not selected</span>
+            {% endif %}
+          </p>
         </div>
       </div>
 
@@ -38,13 +45,13 @@
         </div>
         <div class="card-body p-0">
           {% if assignments %}
-            {% regroup assignments by official.certification as cert_groups %}
+            {% regroup assignments by role as cert_groups %}
             <div class="accordion" id="officialsByCert">
               {% for group in cert_groups %}
                 <div class="accordion-item">
                   <h2 class="accordion-header" id="cert-heading-{{ forloop.counter }}">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cert-collapse-{{ forloop.counter }}" aria-expanded="false" aria-controls="cert-collapse-{{ forloop.counter }}">
-                      <strong>{{ group.grouper.name }}</strong>
+                      <strong>{{ group.grouper|default:"(Unspecified Role)" }}</strong>
                       <span class="ms-2 badge bg-light text-dark">{{ group.list|length }}</span>
                     </button>
                   </h2>
@@ -55,11 +62,19 @@
                           <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span>{{ a.official.name }}</span>
                             <span class="small">
-                              {% if a.confirmed %}
-                                <span class="badge bg-success">Confirmed</span>
-                              {% else %}
-                                <span class="badge bg-warning text-dark">Unconfirmed</span>
-                              {% endif %}
+                              {% with p=a.official.proficiency %}
+                                {% if p == 'Expert' %}
+                                  <span class="badge bg-dark">{{ p }}</span>
+                                {% elif p == 'Advanced' %}
+                                  <span class="badge bg-primary">{{ p }}</span>
+                                {% elif p == 'Intermediate' %}
+                                  <span class="badge bg-info text-dark">{{ p }}</span>
+                                {% elif p == 'Beginner' %}
+                                  <span class="badge bg-secondary">{{ p }}</span>
+                                {% else %}
+                                  <span class="badge bg-light text-dark">{{ p|default:'Proficiency N/A' }}</span>
+                                {% endif %}
+                              {% endwith %}
                             </span>
                           </li>
                         {% endfor %}
@@ -73,6 +88,37 @@
             <div class="p-3">
               <div class="alert alert-info mb-0">No officials assigned yet.</div>
             </div>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Pool -->
+      <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+          <h5 class="mb-0"><i class="fas fa-swimming-pool me-2"></i>Pool</h5>
+        </div>
+        <div class="card-body">
+          {% if meet.pool %}
+            <div class="row">
+              <div class="col-12 col-md-6">
+                <p class="mb-1"><strong>Name:</strong> {{ meet.pool.name }}</p>
+                <p class="mb-1"><strong>Length:</strong> {{ meet.pool.length }} {{ meet.pool.units }}</p>
+                <p class="mb-1"><strong>Lanes:</strong> {{ meet.pool.lanes }}</p>
+                <p class="mb-1"><strong>Bidirectional:</strong> {% if meet.pool.bidirectional %}Yes{% else %}No{% endif %}</p>
+              </div>
+              <div class="col-12 col-md-6">
+                <p class="mb-1"><strong>Team:</strong> {{ meet.pool.team.name }}</p>
+                <p class="mb-1"><strong>Address:</strong>
+                  {% if meet.pool.address %}
+                    {{ meet.pool.address }}
+                  {% else %}
+                    <span class="text-muted">Not specified</span>
+                  {% endif %}
+                </p>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-warning mb-0">No pool selected for this meet.</div>
           {% endif %}
         </div>
       </div>

@@ -35,12 +35,30 @@ def meet_detail(request, pk):
         return redirect('meet_list')
     
     assignments = meet.assignments.all().select_related('official')
+    # Eligible referees: confirmed assignments with role containing 'referee'
+    eligible_referees = (
+        meet.assignments.filter(confirmed=True, role__icontains='referee')
+        .select_related('official')
+        .order_by('official__name')
+    )
+    # Resolve Meet Referee to display in Meet Info
+    meet_referee = None
+    try:
+        selected_ref_id = request.session.get(f'meet_{meet.id}_referee_official_id')
+        if selected_ref_id:
+            meet_referee = Official.objects.filter(id=selected_ref_id).first()
+        elif eligible_referees.count() == 1:
+            meet_referee = eligible_referees.first().official
+    except Exception:
+        meet_referee = None
     participating_teams = meet.participating_teams.all()
     
     return render(request, 'officials/meet_detail.html', {
         'meet': meet,
         'assignments': assignments,
         'participating_teams': participating_teams,
+        'eligible_referees': eligible_referees,
+        'meet_referee': meet_referee,
     })
 
 
@@ -774,23 +792,45 @@ def meet_configure(request, pk):
             event_positions_qs = []
     except Exception:
         event_positions_qs = []
-    # Get Assignments for this meet (for Officials section), include related official and their certification
+    # Get Assignments for this meet (for Officials section), include related official.
+    # Grouping/headers will use Assignment.role (certification stored on the assignment).
     try:
         from .models import Assignment
         assignments_qs = (
             Assignment.objects
             .filter(meet=meet)
-            .select_related('official', 'official__certification')
-            .order_by('official__certification__level', 'official__certification__name', 'official__name')
+            .select_related('official')
+            .order_by('role', 'official__name')
         )
     except Exception:
         assignments_qs = []
+    # Eligible referees for this meet (confirmed role contains 'referee')
+    try:
+        eligible_referees = (
+            meet.assignments.filter(confirmed=True, role__icontains='referee')
+            .select_related('official')
+            .order_by('official__name')
+        )
+    except Exception:
+        eligible_referees = []
+    # Resolve selected meet referee
+    meet_referee = None
+    try:
+        selected_ref_id = request.session.get(f'meet_{meet.id}_referee_official_id')
+        if selected_ref_id:
+            meet_referee = Official.objects.filter(id=selected_ref_id).first()
+        elif hasattr(eligible_referees, 'count') and eligible_referees.count() == 1:
+            meet_referee = eligible_referees.first().official
+    except Exception:
+        meet_referee = None
     context = {
         'meet': meet,
         'today': _date.today(),
         'events': events_qs,
         'event_positions': event_positions_qs,
         'assignments': assignments_qs,
+        'eligible_referees': eligible_referees,
+        'meet_referee': meet_referee,
     }
     return render(request, 'officials/meet_configure.html', context)
 
@@ -806,6 +846,29 @@ def meet_configure_proceed(request, pk):
     if request.method != 'POST':
         messages.error(request, 'Invalid request method.')
         return redirect('meet_detail', pk=pk)
+    # Validate required Meet Referee selection
+    referee_id = request.POST.get('meet_referee_id')
+    if not referee_id:
+        messages.error(request, 'Please select a Meet Referee before proceeding.')
+        return redirect('meet_detail', pk=pk)
+    try:
+        referee_id_int = int(referee_id)
+    except (TypeError, ValueError):
+        messages.error(request, 'Invalid referee selection.')
+        return redirect('meet_detail', pk=pk)
+    # Ensure the selected official is a confirmed Referee assignment for this meet
+    is_valid_ref = Assignment.objects.filter(
+        meet=meet,
+        confirmed=True,
+        official_id=referee_id_int,
+        role__icontains='referee',
+    ).select_related('official').exists()
+    if not is_valid_ref:
+        messages.error(request, 'Selected official is not a confirmed Referee for this meet.')
+        return redirect('meet_detail', pk=pk)
+    # Persist selection in session for later steps (until a model field exists)
+    request.session[f'meet_{meet.id}_referee_official_id'] = referee_id_int
+    messages.success(request, 'Meet Referee selected. Proceeding to configure the meet...')
     # Delete unconfirmed assignments
     qs = Assignment.objects.filter(meet=meet, confirmed=False)
     removed = qs.count()

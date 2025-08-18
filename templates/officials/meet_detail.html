@@ -36,6 +36,13 @@
                     <p><strong>League:</strong> <a href="{% url 'league_detail' meet.league.id %}">{{ meet.league.name }}</a></p>
                     <p><strong>Division:</strong> {% if meet.division %}{{ meet.division.name }}{% else %}<span class="text-muted">Not specified</span>{% endif %}</p>
                     <p><strong>Strategy:</strong> {{ meet.strategy|default:'-' }}</p>
+                    <p><strong>Meet Referee:</strong>
+                        {% if meet_referee %}
+                            <a href="{% url 'official_detail' meet_referee.id %}">{{ meet_referee.name }}</a>
+                        {% else %}
+                            <span class="text-muted">Not selected</span>
+                        {% endif %}
+                    </p>
                     
                     {% if meet.pool %}
                         <p><strong>Pool:</strong> {{ meet.pool.name }} ({{ meet.pool.length }} {{ meet.pool.units }}, {{ meet.pool.lanes }} lanes)</p>
@@ -163,6 +170,18 @@
                 <div class="card-body">
                     <form method="post" action="{% url 'meet_configure_proceed' meet.id %}">
                         {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="meetRefereeSelect" class="form-label">Meet Referee <span class="text-danger">*</span></label>
+                            <select id="meetRefereeSelect" name="meet_referee_id" class="form-select" required>
+                                <option value="">Select a confirmed Referee...</option>
+                                {% for a in eligible_referees %}
+                                    <option value="{{ a.official.id }}">{{ a.official.name }}{% if a.role %} — {{ a.role }}{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            {% if eligible_referees|length == 0 %}
+                                <div class="form-text text-danger">No confirmed Referee currently assigned. Please assign and confirm a Referee in the Meet Officials section above.</div>
+                            {% endif %}
+                        </div>
                         <div class="form-check mb-3">
                             <input class="form-check-input" type="checkbox" value="1" id="finalizeOfficialsCheckbox" name="finalize_officials">
                             <label class="form-check-label" for="finalizeOfficialsCheckbox">
@@ -180,11 +199,17 @@
             (function() {
                 const cb = document.getElementById('finalizeOfficialsCheckbox');
                 const btn = document.getElementById('proceedConfigureBtn');
-                if (cb && btn) {
-                    cb.addEventListener('change', function() {
-                        btn.disabled = !this.checked;
-                    });
+                const sel = document.getElementById('meetRefereeSelect');
+
+                function updateProceedState() {
+                    const hasRef = sel && sel.value !== '';
+                    const isChecked = cb && cb.checked;
+                    btn.disabled = !(hasRef && isChecked);
                 }
+
+                if (cb) cb.addEventListener('change', updateProceedState);
+                if (sel) sel.addEventListener('change', updateProceedState);
+                updateProceedState();
             })();
             </script>
 
