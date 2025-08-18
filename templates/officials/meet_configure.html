@@ -17,8 +17,8 @@
   </div>
 
   <div class="row">
-    <!-- Meet Information (match styling from meet_detail) -->
-    <div class="col-lg-4 mb-4">
+    <!-- Meet Information only -->
+    <div class="col-lg-6 col-xl-5 mb-4">
       <div class="card">
         <div class="card-header {% if meet.date < today %}bg-secondary text-white{% elif meet.date == today %}bg-primary text-white{% else %}bg-info text-white{% endif %}">
           <h5 class="mb-0">Meet Information</h5>
@@ -31,53 +31,115 @@
         </div>
       </div>
 
-      <!-- Positions to Fill -->
+      <!-- Officials grouped by Certification -->
       <div class="card mt-4">
-        <div class="card-header bg-warning">
-          <h5 class="mb-0"><i class="fas fa-user-check me-2"></i>Positions to Fill</h5>
+        <div class="card-header bg-secondary text-white">
+          <h5 class="mb-0"><i class="fas fa-users me-2"></i>Officials</h5>
         </div>
         <div class="card-body p-0">
-          {% if meet.strategy %}
-            <ul class="list-group list-group-flush">
-              {% for pos in meet.strategy.positions.all %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                  <div>
-                    <div class="fw-semibold">{{ pos.role }}</div>
-                    <div class="small text-muted">{{ pos.location }}</div>
+          {% if assignments %}
+            {% regroup assignments by official.certification as cert_groups %}
+            <div class="accordion" id="officialsByCert">
+              {% for group in cert_groups %}
+                <div class="accordion-item">
+                  <h2 class="accordion-header" id="cert-heading-{{ forloop.counter }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cert-collapse-{{ forloop.counter }}" aria-expanded="false" aria-controls="cert-collapse-{{ forloop.counter }}">
+                      <strong>{{ group.grouper.name }}</strong>
+                      <span class="ms-2 badge bg-light text-dark">{{ group.list|length }}</span>
+                    </button>
+                  </h2>
+                  <div id="cert-collapse-{{ forloop.counter }}" class="accordion-collapse collapse" aria-labelledby="cert-heading-{{ forloop.counter }}" data-bs-parent="#officialsByCert">
+                    <div class="accordion-body p-0">
+                      <ul class="list-group list-group-flush">
+                        {% for a in group.list %}
+                          <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ a.official.name }}</span>
+                            <span class="small">
+                              {% if a.confirmed %}
+                                <span class="badge bg-success">Confirmed</span>
+                              {% else %}
+                                <span class="badge bg-warning text-dark">Unconfirmed</span>
+                              {% endif %}
+                            </span>
+                          </li>
+                        {% endfor %}
+                      </ul>
+                    </div>
                   </div>
-                  <div class="text-nowrap small">
-                    {% if pos.minimum_certification %}
-                      Min: {{ pos.minimum_certification.abbreviation|default:pos.minimum_certification.name }}
-                    {% else %}
-                      <span class="text-muted">No min cert</span>
-                    {% endif %}
-                  </div>
-                </li>
-              {% empty %}
-                <li class="list-group-item text-muted">No positions defined for this strategy.</li>
+                </div>
               {% endfor %}
-            </ul>
+            </div>
           {% else %}
             <div class="p-3">
-              <div class="alert alert-info mb-0">
-                Set a Strategy on the Meet to see positions to fill.
-              </div>
+              <div class="alert alert-info mb-0">No officials assigned yet.</div>
             </div>
           {% endif %}
         </div>
       </div>
     </div>
-
-    <!-- Meet Schedule content column (placeholder for now) -->
-    <div class="col-lg-8">
+    <!-- Positions list -->
+    <div class="col-lg-6 col-xl-7 mb-4">
       <div class="card">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Schedule</h5>
+        <div class="card-header bg-warning d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Positions</h5>
+          <span class="small">Meet Type: {{ meet.get_meet_type_display }}{% if meet.strategy %} • Strategy: {{ meet.strategy.get_name_display|default:meet.strategy }}{% endif %}</span>
         </div>
-        <div class="card-body">
-          <div class="alert alert-info mb-0">
-            Schedule configuration and details will appear here.
-          </div>
+        <div class="card-body p-0">
+          {% if not meet.strategy %}
+            <div class="p-3">
+              <div class="alert alert-info mb-0">Set a Strategy for this meet to view positions.</div>
+            </div>
+          {% else %}
+            {% if event_positions %}
+              {% regroup event_positions by event as event_groups %}
+              <div class="accordion" id="positionsByEvent">
+                {% for group in event_groups %}
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading-{{ group.grouper.id }}">
+                      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ group.grouper.id }}" aria-expanded="false" aria-controls="collapse-{{ group.grouper.id }}">
+                        <span class="me-2 badge bg-light text-dark">#{{ group.grouper.event_number }}</span>
+                        <strong>{{ group.grouper.name }}</strong>
+                      </button>
+                    </h2>
+                    <div id="collapse-{{ group.grouper.id }}" class="accordion-collapse collapse" aria-labelledby="heading-{{ group.grouper.id }}" data-bs-parent="#positionsByEvent">
+                      <div class="accordion-body p-0">
+                        <ul class="list-group list-group-flush">
+                          {% for ep in group.list %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                              <div>
+                                <div class="fw-semibold">{{ ep.position.role }}</div>
+                                <div class="small text-muted">{{ ep.position.location|default:'-' }}</div>
+                              </div>
+                              <div class="text-end small">
+                                <div>
+                                  {% if ep.is_mandatory %}
+                                    <span class="badge bg-success">Mandatory</span>
+                                  {% else %}
+                                    <span class="badge bg-secondary">Optional</span>
+                                  {% endif %}
+                                </div>
+                                <div>
+                                  {% if ep.position.minimum_certification %}
+                                    Min: {{ ep.position.minimum_certification.abbreviation|default:ep.position.minimum_certification.name }}
+                                  {% else %}
+                                    <span class="text-muted">No min cert</span>
+                                  {% endif %}
+                                </div>
+                              </div>
+                            </li>
+                          {% endfor %}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="p-3">
+                <div class="alert alert-warning mb-0">No event positions defined for this meet type and strategy.</div>
+              </div>
+            {% endif %}
+          {% endif %}
         </div>
       </div>
     </div>

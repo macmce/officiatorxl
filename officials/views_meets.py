@@ -754,9 +754,43 @@ def meet_configure(request, pk):
         messages.error(request, 'You do not have permission to configure this meet.')
         return redirect('meet_detail', pk=pk)
     from datetime import date as _date
+    # Get events for this meet type
+    try:
+        from .models import Event
+        events_qs = Event.objects.filter(meet_type=meet.meet_type).order_by('event_number')
+    except Exception:
+        events_qs = []
+    # Get Event Positions for this meet type and strategy
+    try:
+        from .models import EventPosition
+        if meet.strategy:
+            event_positions_qs = (
+                EventPosition.objects
+                .select_related('event', 'position', 'position__minimum_certification', 'position__strategy')
+                .filter(event__meet_type=meet.meet_type, position__strategy=meet.strategy)
+                .order_by('event__event_number', 'position__role')
+            )
+        else:
+            event_positions_qs = []
+    except Exception:
+        event_positions_qs = []
+    # Get Assignments for this meet (for Officials section), include related official and their certification
+    try:
+        from .models import Assignment
+        assignments_qs = (
+            Assignment.objects
+            .filter(meet=meet)
+            .select_related('official', 'official__certification')
+            .order_by('official__certification__level', 'official__certification__name', 'official__name')
+        )
+    except Exception:
+        assignments_qs = []
     context = {
         'meet': meet,
         'today': _date.today(),
+        'events': events_qs,
+        'event_positions': event_positions_qs,
+        'assignments': assignments_qs,
     }
     return render(request, 'officials/meet_configure.html', context)
 
