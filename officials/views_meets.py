@@ -666,7 +666,12 @@ def assignment_update(request, pk):
     if request.method == 'POST':
         form = AssignmentForm(request.POST, instance=assignment)
         if form.is_valid():
-            form.save()
+            # Save role (certification) explicitly to ensure persistence
+            updated = form.save(commit=False)
+            new_role = form.cleaned_data.get('role')
+            if new_role:
+                updated.role = new_role
+            updated.save()
             # Persist proficiency changes for the assigned official if provided
             try:
                 new_prof = form.cleaned_data.get('official_proficiency')
@@ -728,6 +733,7 @@ def toggle_assignment_confirm(request, pk):
         messages.error(request, 'You do not have permission to modify this assignment.')
         return redirect('meet_detail', pk=assignment.meet.pk)
     if request.method == 'POST':
+        # Proceed to toggle without certification check
         assignment.confirmed = not assignment.confirmed
         assignment.save(update_fields=['confirmed'])
         if assignment.confirmed:
@@ -737,3 +743,17 @@ def toggle_assignment_confirm(request, pk):
     else:
         messages.error(request, 'Invalid request method.')
     return redirect('meet_detail', pk=assignment.meet.pk)
+
+
+@login_required
+def meet_configure(request, pk):
+    """Display the Configure Meet page with basic meet information."""
+    meet = get_object_or_404(Meet, pk=pk)
+    # Permission: user must have access to the meet's league unless staff
+    if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to configure this meet.')
+        return redirect('meet_detail', pk=pk)
+    context = {
+        'meet': meet,
+    }
+    return render(request, 'officials/meet_configure.html', context)

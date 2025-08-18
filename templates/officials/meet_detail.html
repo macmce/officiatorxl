@@ -87,6 +87,8 @@
             </div>
         </div>
 
+        
+
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -102,9 +104,8 @@
                                 <thead>
                                     <tr>
                                         <th>Official</th>
-                                        <th>Position</th>
-                                        <th>Team</th>
                                         <th>Certification</th>
+                                        <th>Team</th>
                                         <th>Proficiency</th>
                                         <th>Status</th>
                                         <th>Actions</th>
@@ -116,7 +117,6 @@
                                             <td><a href="{% url 'official_detail' assignment.official.id %}">{{ assignment.official.name }}</a></td>
                                             <td>{{ assignment.role }}</td>
                                             <td>{{ assignment.official.team.name }}</td>
-                                            <td>{% if assignment.official.certification %}{{ assignment.official.certification.name }}{% else %}<span class="text-muted">None</span>{% endif %}</td>
                                             <td>{{ assignment.official.get_proficiency_display }}</td>
                                             <td>
                                                 {% if assignment.confirmed %}
@@ -154,6 +154,41 @@
                     {% endif %}
                 </div>
             </div>
+
+            <!-- Configure Meet Section moved under Meet Officials -->
+            <div class="card mt-4 shadow-sm">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Configure Meet</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" value="1" id="finalizeOfficialsCheckbox">
+                        <label class="form-check-label" for="finalizeOfficialsCheckbox">
+                            Officials List is Final. Unconfirmed officials will be removed from this meet.
+                        </label>
+                    </div>
+                    <button type="button" id="proceedConfigureBtn" class="btn btn-primary" disabled>
+                        Proceed
+                    </button>
+                </div>
+            </div>
+
+            <script>
+            (function() {
+                const cb = document.getElementById('finalizeOfficialsCheckbox');
+                const btn = document.getElementById('proceedConfigureBtn');
+                if (cb && btn) {
+                    cb.addEventListener('change', function() {
+                        btn.disabled = !this.checked;
+                    });
+                    btn.addEventListener('click', function() {
+                        if (!btn.disabled) {
+                            window.location.href = "{% url 'meet_configure' meet.id %}";
+                        }
+                    });
+                }
+            })();
+            </script>
 
             {% if available_officials %}
                 <div class="card mt-4">

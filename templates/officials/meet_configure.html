@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configure Meet - {{ meet.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Configure Meet</h5>
+          <a href="{% url 'meet_detail' meet.id %}" class="btn btn-sm btn-outline-secondary">Back to Meet</a>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <h6 class="text-muted mb-1">Meet</h6>
+            <div class="fs-5 fw-semibold">{{ meet.name }}</div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="small text-muted">Date</div>
+              <div>{{ meet.date }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Start Time</div>
+              <div>{{ meet.start_time }}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">League / Division</div>
+              <div>{{ meet.league.name }}{% if meet.division %} / {{ meet.division.name }}{% endif %}</div>
+            </div>
+            <div class="col-md-4">
+              <div class="small text-muted">Host Team</div>
+              <div>{{ meet.host_team.name }}</div>
+            </div>
+            <div class="col-md-8">
+              <div class="small text-muted">Pool</div>
+              <div>{% if meet.pool %}{{ meet.pool.name }}{% else %}<span class="text-muted">Not set</span>{% endif %}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Placeholder for additional configuration content to be added later -->
+      <div class="alert alert-info">
+        Additional configuration options will appear here.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
