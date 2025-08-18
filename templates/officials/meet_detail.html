@@ -127,15 +127,15 @@
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{% url 'assignment_update' assignment.id %}" class="btn btn-outline-secondary">
-                                                        <i class="fas fa-edit"></i>
-                                                    </a>
                                                     <form method="post" action="{% url 'assignment_toggle_confirm' assignment.id %}" class="d-inline">
                                                         {% csrf_token %}
                                                         <button type="submit" class="btn {% if assignment.confirmed %}btn-success{% else %}btn-outline-success{% endif %}" title="Confirm/Unconfirm">
                                                             <i class="fas fa-check"></i>
                                                         </button>
                                                     </form>
+                                                    <a href="{% url 'assignment_update' assignment.id %}" class="btn btn-outline-secondary">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
                                                     <a href="{% url 'assignment_delete' assignment.id %}" class="btn btn-outline-danger">
                                                         <i class="fas fa-trash-alt"></i>
                                                     </a>
@@ -161,15 +161,18 @@
                     <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Configure Meet</h5>
                 </div>
                 <div class="card-body">
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" value="1" id="finalizeOfficialsCheckbox">
-                        <label class="form-check-label" for="finalizeOfficialsCheckbox">
-                            Officials List is Final. Unconfirmed officials will be removed from this meet.
-                        </label>
-                    </div>
-                    <button type="button" id="proceedConfigureBtn" class="btn btn-primary" disabled>
-                        Proceed
-                    </button>
+                    <form method="post" action="{% url 'meet_configure_proceed' meet.id %}">
+                        {% csrf_token %}
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" value="1" id="finalizeOfficialsCheckbox" name="finalize_officials">
+                            <label class="form-check-label" for="finalizeOfficialsCheckbox">
+                                Officials List is Final. Unconfirmed officials will be removed from this meet.
+                            </label>
+                        </div>
+                        <button type="submit" id="proceedConfigureBtn" class="btn btn-primary" disabled>
+                            Proceed
+                        </button>
+                    </form>
                 </div>
             </div>
 
@@ -180,11 +183,6 @@
                 if (cb && btn) {
                     cb.addEventListener('change', function() {
                         btn.disabled = !this.checked;
-                    });
-                    btn.addEventListener('click', function() {
-                        if (!btn.disabled) {
-                            window.location.href = "{% url 'meet_configure' meet.id %}";
-                        }
                     });
                 }
             })();

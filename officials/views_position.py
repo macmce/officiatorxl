@@ -10,6 +10,7 @@ from django.http import HttpResponse
 from django.db import IntegrityError
 from django.contrib.auth.decorators import login_required
 from django_filters.views import FilterView
+from django.utils.http import urlencode
 
 from .models import Position, Strategy
 from .forms import PositionForm, PositionImportForm
@@ -31,6 +32,10 @@ class PositionListView(LoginRequiredMixin, FilterView):
         context = super().get_context_data(**kwargs)
         # Add filter status flag to indicate if any filters are active
         context['filters_active'] = any(self.request.GET.get(param) for param in self.filterset.form.fields)
+        # Preserve current filters in pagination links
+        params = self.request.GET.copy()
+        params.pop('page', None)
+        context['query_string'] = ('&' + urlencode(params, doseq=True)) if params else ''
         return context
 
 class PositionCreateView(LoginRequiredMixin, SuccessMessageMixin, CreateView):

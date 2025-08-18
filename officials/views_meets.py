@@ -753,7 +753,31 @@ def meet_configure(request, pk):
     if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
         messages.error(request, 'You do not have permission to configure this meet.')
         return redirect('meet_detail', pk=pk)
+    from datetime import date as _date
     context = {
         'meet': meet,
+        'today': _date.today(),
     }
     return render(request, 'officials/meet_configure.html', context)
+
+
+@login_required
+def meet_configure_proceed(request, pk):
+    """When proceeding, delete all unconfirmed assignments for the meet, then go to configure page."""
+    meet = get_object_or_404(Meet, pk=pk)
+    # Permission check
+    if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to configure this meet.')
+        return redirect('meet_detail', pk=pk)
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('meet_detail', pk=pk)
+    # Delete unconfirmed assignments
+    qs = Assignment.objects.filter(meet=meet, confirmed=False)
+    removed = qs.count()
+    qs.delete()
+    if removed:
+        messages.success(request, f'Removed {removed} unconfirmed assignment(s).')
+    else:
+        messages.info(request, 'No unconfirmed assignments to remove.')
+    return redirect('meet_configure', pk=pk)

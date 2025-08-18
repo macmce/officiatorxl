@@ -64,6 +64,7 @@ urlpatterns = [
     path('meets/<int:pk>/update/', views.meet_update, name='meet_update'),
     path('meets/<int:pk>/delete/', views.meet_delete, name='meet_delete'),
     path('meets/<int:pk>/configure/', views_meets.meet_configure, name='meet_configure'),
+    path('meets/<int:pk>/configure/proceed/', views_meets.meet_configure_proceed, name='meet_configure_proceed'),
     
     # Assignment URLs
     path('assignments/', views.assignment_list, name='assignment_list'),

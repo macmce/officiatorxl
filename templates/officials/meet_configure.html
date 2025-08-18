@@ -1,50 +1,84 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Configure Meet - {{ meet.name }}{% endblock %}
+{% block title %}Meet Schedule - {{ meet.name }}{% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h2">
+      <i class="fas fa-calendar-alt me-2"></i>Meet Schedule
+    </h1>
+    <div>
+      <a href="{% url 'meet_detail' meet.id %}" class="btn btn-outline-secondary">
+        <i class="fas fa-chevron-left me-1"></i>Back to Meet
+      </a>
+    </div>
+  </div>
+
   <div class="row">
-    <div class="col-12">
-      <div class="card shadow-sm mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0">Configure Meet</h5>
-          <a href="{% url 'meet_detail' meet.id %}" class="btn btn-sm btn-outline-secondary">Back to Meet</a>
+    <!-- Meet Information (match styling from meet_detail) -->
+    <div class="col-lg-4 mb-4">
+      <div class="card">
+        <div class="card-header {% if meet.date < today %}bg-secondary text-white{% elif meet.date == today %}bg-primary text-white{% else %}bg-info text-white{% endif %}">
+          <h5 class="mb-0">Meet Information</h5>
         </div>
         <div class="card-body">
-          <div class="mb-3">
-            <h6 class="text-muted mb-1">Meet</h6>
-            <div class="fs-5 fw-semibold">{{ meet.name }}</div>
-          </div>
-          <div class="row g-3">
-            <div class="col-md-4">
-              <div class="small text-muted">Date</div>
-              <div>{{ meet.date }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="small text-muted">Start Time</div>
-              <div>{{ meet.start_time }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="small text-muted">League / Division</div>
-              <div>{{ meet.league.name }}{% if meet.division %} / {{ meet.division.name }}{% endif %}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="small text-muted">Host Team</div>
-              <div>{{ meet.host_team.name }}</div>
-            </div>
-            <div class="col-md-8">
-              <div class="small text-muted">Pool</div>
-              <div>{% if meet.pool %}{{ meet.pool.name }}{% else %}<span class="text-muted">Not set</span>{% endif %}</div>
-            </div>
-          </div>
+          <p><strong>Name:</strong> {{ meet.name }}</p>
+          <p><strong>Meet Type:</strong> {{ meet.get_meet_type_display }}</p>
+          <p><strong>Host Team:</strong> {% if meet.host_team %}{{ meet.host_team.name }}{% else %}<span class="text-muted">Not specified</span>{% endif %}</p>
+          <p><strong>Strategy:</strong> {{ meet.strategy|default:'-' }}</p>
         </div>
       </div>
 
-      <!-- Placeholder for additional configuration content to be added later -->
-      <div class="alert alert-info">
-        Additional configuration options will appear here.
+      <!-- Positions to Fill -->
+      <div class="card mt-4">
+        <div class="card-header bg-warning">
+          <h5 class="mb-0"><i class="fas fa-user-check me-2"></i>Positions to Fill</h5>
+        </div>
+        <div class="card-body p-0">
+          {% if meet.strategy %}
+            <ul class="list-group list-group-flush">
+              {% for pos in meet.strategy.positions.all %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <div class="fw-semibold">{{ pos.role }}</div>
+                    <div class="small text-muted">{{ pos.location }}</div>
+                  </div>
+                  <div class="text-nowrap small">
+                    {% if pos.minimum_certification %}
+                      Min: {{ pos.minimum_certification.abbreviation|default:pos.minimum_certification.name }}
+                    {% else %}
+                      <span class="text-muted">No min cert</span>
+                    {% endif %}
+                  </div>
+                </li>
+              {% empty %}
+                <li class="list-group-item text-muted">No positions defined for this strategy.</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="p-3">
+              <div class="alert alert-info mb-0">
+                Set a Strategy on the Meet to see positions to fill.
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Meet Schedule content column (placeholder for now) -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Schedule</h5>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info mb-0">
+            Schedule configuration and details will appear here.
+          </div>
+        </div>
       </div>
     </div>
   </div>
