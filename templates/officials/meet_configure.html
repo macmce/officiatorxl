@@ -123,8 +123,56 @@
         </div>
       </div>
     </div>
-    <!-- Positions list -->
+    <!-- Right column: Build it! and Positions -->
     <div class="col-lg-6 col-xl-7 mb-4">
+      <!-- Build it! -->
+      <div class="card mb-4">
+        <div class="card-header bg-success text-white d-flex align-items-center">
+          <h5 class="mb-0"><i class="fas fa-hammer me-2"></i>Build it!</h5>
+        </div>
+        <div class="card-body">
+          <form method="post" action="{% url 'meet_build_schedule' meet.id %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label">Build option</label>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="build_option" id="buildLightest" value="LIGHTEST" checked>
+                <label class="form-check-label" for="buildLightest">Lightest</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="build_option" id="buildHeaviest" value="HEAVIEST">
+                <label class="form-check-label" for="buildHeaviest">Heaviest</label>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              Proceed
+            </button>
+          </form>
+          {% if schedules %}
+            <hr>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h6 class="mb-0">Built Schedules</h6>
+              <span class="badge bg-secondary">{{ schedules|length }}</span>
+            </div>
+            <div class="list-group">
+              {% for s in schedules %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                  <div>
+                    <div class="fw-semibold">{{ s.name }}</div>
+                    <div class="text-muted small">
+                      {{ s.created_at|date:"Y-m-d H:i:s" }} • Option: {{ s.get_build_option_display }}
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-muted small">No schedules built yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Positions list -->
       <div class="card">
         <div class="card-header bg-warning d-flex justify-content-between align-items-center">
           <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i>Positions</h5>

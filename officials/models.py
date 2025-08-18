@@ -303,3 +303,22 @@ class EventPosition(models.Model):
     def __str__(self):
         mandatory_status = "Mandatory" if self.is_mandatory else "Optional"
         return f"{self.position.role} for {self.event} ({mandatory_status})"
+
+
+class MeetSchedule(models.Model):
+    """Persisted schedule built for a meet."""
+    BUILD_CHOICES = [
+        ("LIGHTEST", "Lightest"),
+        ("HEAVIEST", "Heaviest"),
+    ]
+
+    meet = models.ForeignKey(Meet, on_delete=models.CASCADE, related_name='schedules')
+    name = models.CharField(max_length=255)
+    build_option = models.CharField(max_length=20, choices=BUILD_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name

@@ -3,9 +3,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from .models import Meet, Assignment, Team, Official, League, Pool
+from .models import Meet, Assignment, Team, Official, League, Pool, MeetSchedule
 from .forms import MeetForm, AssignmentForm
 from datetime import datetime
+from django.utils import timezone
 
 
 # Meet views
@@ -59,6 +60,7 @@ def meet_detail(request, pk):
         'participating_teams': participating_teams,
         'eligible_referees': eligible_referees,
         'meet_referee': meet_referee,
+        'schedules': getattr(meet, 'schedules', None) and meet.schedules.all() or [],
     })
 
 
@@ -831,6 +833,7 @@ def meet_configure(request, pk):
         'assignments': assignments_qs,
         'eligible_referees': eligible_referees,
         'meet_referee': meet_referee,
+        'schedules': getattr(meet, 'schedules', None) and meet.schedules.all() or [],
     }
     return render(request, 'officials/meet_configure.html', context)
 
@@ -877,4 +880,32 @@ def meet_configure_proceed(request, pk):
         messages.success(request, f'Removed {removed} unconfirmed assignment(s).')
     else:
         messages.info(request, 'No unconfirmed assignments to remove.')
+    return redirect('meet_configure', pk=pk)
+
+
+@login_required
+def meet_build_schedule(request, pk):
+    """Build and persist a meet schedule record with a timestamped name."""
+    meet = get_object_or_404(Meet, pk=pk)
+    # Permission: user must have access to the meet's league unless staff
+    if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to build a schedule for this meet.')
+        return redirect('meet_detail', pk=pk)
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('meet_configure', pk=pk)
+    option = request.POST.get('build_option', 'LIGHTEST').upper()
+    if option not in dict(MeetSchedule.BUILD_CHOICES):
+        option = 'LIGHTEST'
+    timestamp = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    schedule_name = f"{meet.name} - {timestamp}"
+    try:
+        MeetSchedule.objects.create(
+            meet=meet,
+            name=schedule_name,
+            build_option=option,
+        )
+        messages.success(request, f'Schedule "{schedule_name}" created ({option.title()}).')
+    except Exception as e:
+        messages.error(request, f'Failed to create schedule: {e}')
     return redirect('meet_configure', pk=pk)
