@@ -249,6 +249,10 @@ def meet_create_step3(request):
             # Add participating teams
             participating_teams = Team.objects.filter(id__in=meet_data['participating_teams_ids'])
             meet.participating_teams.set(participating_teams)
+            # Auto-assign officials from participating teams
+            created_count = _auto_assign_participating_officials(meet)
+            if created_count:
+                messages.info(request, f"Auto-assigned {created_count} officials to this meet.")
             
             # Store weather data if available (would be stored as JSON)
             # if 'weather' in meet_data:
@@ -275,6 +279,40 @@ def meet_create_step3(request):
 
 import logging
 logger = logging.getLogger(__name__)
+
+def _auto_assign_participating_officials(meet: Meet):
+    """Assign all officials from participating teams to the given meet.
+    Creates an Assignment per official with a default role and an auto-generated note.
+    Safe to call multiple times; uses get_or_create to avoid duplicates.
+    """
+    try:
+        participating_teams = meet.participating_teams.all()
+        if not participating_teams.exists():
+            return 0
+        officials = Official.objects.filter(team__in=participating_teams).distinct()
+        created_count = 0
+        for official in officials:
+            # Use the official's certification name if available; else a generic default
+            role_label = 'Official'
+            try:
+                if getattr(official, 'certification_id', None):
+                    role_label = official.certification.name
+            except Exception:
+                role_label = 'Official'
+            assignment, created = Assignment.objects.get_or_create(
+                meet=meet,
+                official=official,
+                role=role_label,
+                defaults={
+                    'notes': 'Auto-assigned when the meet was created.'
+                }
+            )
+            if created:
+                created_count += 1
+        return created_count
+    except Exception as e:
+        logger.error(f"Auto-assign failed for meet {meet.id}: {e}")
+        return 0
 
 def meet_create(request):
     """
@@ -332,6 +370,10 @@ def meet_create(request):
                 for team_id in team_ids:
                     meet.participating_teams.add(team_id)
                 logger.info(f"Added {len(team_ids)} participating teams")
+            # Auto-assign officials from participating teams
+            created_count = _auto_assign_participating_officials(meet)
+            if created_count:
+                messages.info(request, f"Auto-assigned {created_count} officials to this meet.")
             
             # Verify persistence by forcing a database lookup
             try:
@@ -473,25 +515,100 @@ def assignment_create(request, meet_id=None):
     
     # Pre-select meet if coming from meet detail page
     initial_data = {}
+    preselected_meet = None
     if meet_id:
-        meet = get_object_or_404(Meet, pk=meet_id)
-        if request.user.leagues.filter(id=meet.league.id).exists() or request.user.is_staff:
-            initial_data['meet'] = meet
+        preselected_meet = get_object_or_404(Meet, pk=meet_id)
+        if request.user.leagues.filter(id=preselected_meet.league.id).exists() or request.user.is_staff:
+            initial_data['meet'] = preselected_meet
+    else:
+        # Support preselecting via query param: /assignments/create/?meet=<id>
+        meet_qs = request.GET.get('meet')
+        if meet_qs:
+            try:
+                preselected_meet = get_object_or_404(Meet, pk=int(meet_qs))
+                if request.user.leagues.filter(id=preselected_meet.league.id).exists() or request.user.is_staff:
+                    initial_data['meet'] = preselected_meet
+            except (ValueError, TypeError):
+                preselected_meet = None
     
     if request.method == 'POST':
-        form = AssignmentForm(request.POST)
+        form = AssignmentForm(request.POST, initial=initial_data)
+        # Ensure new_official_team queryset is set for re-rendering on errors
+        if not request.user.is_staff:
+            accessible_teams = Team.objects.filter(division__league__in=user_leagues)
+            if 'new_official_team' in form.fields:
+                form.fields['new_official_team'].queryset = accessible_teams
+        else:
+            if 'new_official_team' in form.fields:
+                form.fields['new_official_team'].queryset = Team.objects.all()
+        # If meet is known, limit new_official_team to participating teams
+        if preselected_meet and 'new_official_team' in form.fields:
+            form.fields['new_official_team'].queryset = preselected_meet.participating_teams.all()
+        # Filter officials to participating teams that are not yet assigned to this meet
+        meet_for_filter = preselected_meet
+        if meet_for_filter and 'official' in form.fields:
+            participating = meet_for_filter.participating_teams.all()
+            available_officials = Official.objects.filter(team__in=participating).exclude(assignments__meet=meet_for_filter)
+            form.fields['official'].queryset = available_officials
         if form.is_valid():
             assignment = form.save(commit=False)
-            
-            # Check if user has permission to add assignment to this meet
-            if not request.user.leagues.filter(id=assignment.meet.league.id).exists() and not request.user.is_staff:
+
+            # Ensure meet is set (disabled field won't submit). Prefer preselected meet if present
+            meet_obj = preselected_meet or form.cleaned_data.get('meet')
+            if not meet_obj:
+                messages.error(request, 'A meet must be specified for this assignment.')
+                return redirect('assignment_list')
+
+            # Permission check based on the final meet
+            if not request.user.leagues.filter(id=meet_obj.league.id).exists() and not request.user.is_staff:
                 messages.error(request, 'You do not have permission to add assignments to this meet.')
                 return redirect('assignment_list')
-            
-            # Check if this official has the necessary certification
-            if assignment.official.certification is None:
+
+            # Determine official: existing selection or create new, and pick certification for assignment
+            assignment_role_name = assignment.role  # may be '' in new official path
+            official_obj = form.cleaned_data.get('official')
+            new_name = (form.cleaned_data.get('new_official_name') or '').strip()
+            if not official_obj and new_name:
+                # Create a new Official with full details
+                cert_obj = form.cleaned_data.get('new_official_certification')
+                team_obj = form.cleaned_data.get('new_official_team')
+                email = form.cleaned_data.get('new_official_email') or ''
+                phone = form.cleaned_data.get('new_official_phone') or ''
+                active = bool(form.cleaned_data.get('new_official_active'))
+                prof = form.cleaned_data.get('new_official_proficiency') or 'Beginner'
+                official_obj = Official(
+                    name=new_name,
+                    email=email,
+                    phone=phone,
+                    certification=cert_obj,
+                    team=team_obj,
+                    active=active,
+                    proficiency=prof,
+                )
+                official_obj.save()
+                # Use this certification for the assignment role label
+                if cert_obj:
+                    assignment_role_name = cert_obj.name
+            else:
+                # Existing official path: role was cleaned from the form's 'role' field
+                cert_obj = getattr(form, 'selected_certification', None)
+                if cert_obj:
+                    assignment_role_name = cert_obj.name
+
+            # Finalize assignment fields
+            assignment.meet = meet_obj
+            if official_obj:
+                assignment.official = official_obj
+            # Set assignment role explicitly (covers new-official path)
+            if assignment_role_name:
+                assignment.role = assignment_role_name
+            # confirmed is read-only on create; default to False
+            assignment.confirmed = False
+
+            # Warn if official has no certification
+            if not getattr(assignment.official, 'certification_id', None):
                 messages.warning(request, f'Note: {assignment.official.name} has no certification.')
-            
+
             try:
                 assignment.save()
                 messages.success(request, f'Assignment for {assignment.official.name} created successfully!')
@@ -505,13 +622,34 @@ def assignment_create(request, meet_id=None):
             accessible_meets = Meet.objects.filter(league__in=user_leagues)
             form.fields['meet'].queryset = accessible_meets
             
-            # Get officials that belong to teams in the user's leagues
-            accessible_officials = Official.objects.filter(team__division__league__in=user_leagues)
-            form.fields['official'].queryset = accessible_officials
+            # If a meet is preselected, filter officials to participating teams not already assigned
+            if preselected_meet and 'official' in form.fields:
+                participating = preselected_meet.participating_teams.all()
+                available_officials = Official.objects.filter(team__in=participating).exclude(assignments__meet=preselected_meet)
+                form.fields['official'].queryset = available_officials
+            else:
+                # Fallback: empty queryset to force selection via meet context
+                form.fields['official'].queryset = Official.objects.none()
+        else:
+            # Staff can choose any team
+            if 'new_official_team' in form.fields:
+                form.fields['new_official_team'].queryset = Team.objects.all()
+        # For staff as well, scope officials by preselected meet if available
+        if request.user.is_staff and preselected_meet and 'official' in form.fields:
+            participating = preselected_meet.participating_teams.all()
+            available_officials = Official.objects.filter(team__in=participating).exclude(assignments__meet=preselected_meet)
+            form.fields['official'].queryset = available_officials
+        # Limit new_official_team to participating teams if we know the meet; else empty
+        if 'new_official_team' in form.fields:
+            if preselected_meet:
+                form.fields['new_official_team'].queryset = preselected_meet.participating_teams.all()
+            else:
+                form.fields['new_official_team'].queryset = Team.objects.none()
     
     return render(request, 'officials/assignment_form.html', {
         'form': form,
         'title': 'Create Assignment',
+        'preselected_meet': preselected_meet,
     })
 
 
@@ -529,6 +667,15 @@ def assignment_update(request, pk):
         form = AssignmentForm(request.POST, instance=assignment)
         if form.is_valid():
             form.save()
+            # Persist proficiency changes for the assigned official if provided
+            try:
+                new_prof = form.cleaned_data.get('official_proficiency')
+            except Exception:
+                new_prof = None
+            if new_prof and hasattr(assignment, 'official'):
+                if getattr(assignment.official, 'proficiency', None) != new_prof:
+                    assignment.official.proficiency = new_prof
+                    assignment.official.save(update_fields=['proficiency'])
             messages.success(request, f'Assignment for {assignment.official.name} updated successfully!')
             return redirect('meet_detail', pk=assignment.meet.pk)
     else:
@@ -570,3 +717,23 @@ def assignment_delete(request, pk):
     return render(request, 'officials/assignment_confirm_delete.html', {
         'assignment': assignment,
     })
+
+
+@login_required
+def toggle_assignment_confirm(request, pk):
+    """Toggle the confirmed flag on an assignment and redirect back to meet detail."""
+    assignment = get_object_or_404(Assignment, pk=pk)
+    # Permission: user must have access to the assignment's league unless staff
+    if not request.user.leagues.filter(id=assignment.meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to modify this assignment.')
+        return redirect('meet_detail', pk=assignment.meet.pk)
+    if request.method == 'POST':
+        assignment.confirmed = not assignment.confirmed
+        assignment.save(update_fields=['confirmed'])
+        if assignment.confirmed:
+            messages.success(request, f'{assignment.official.name} confirmed for this meet.')
+        else:
+            messages.info(request, f'{assignment.official.name} unconfirmed for this meet.')
+    else:
+        messages.error(request, 'Invalid request method.')
+    return redirect('meet_detail', pk=assignment.meet.pk)

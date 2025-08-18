@@ -70,11 +70,8 @@
                     {% endif %}
                 </div>
             </div>
-        </div>
-
-        <div class="col-lg-8">
-            <!-- Weather Forecast moved to right side above assignments -->
-            <div class="card mb-4" id="weatherForecast" style="display: none;">
+            <!-- Weather Forecast moved beneath Meet Information -->
+            <div class="card mt-4" id="weatherForecast" style="display: none;">
                 <div class="card-header bg-info text-white d-flex align-items-center">
                     <i class="fas fa-cloud-sun me-2"></i>
                     <h5 class="mb-0">Weather Forecast</h5>
@@ -88,9 +85,12 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="col-lg-8">
             <div class="card">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Assignments</h5>
+                    <h5 class="mb-0">Meet Officials</h5>
                     <a href="{% url 'assignment_create' %}?meet={{ meet.id }}" class="btn btn-sm btn-light">
                         <i class="fas fa-plus me-1"></i>Add Assignment
                     </a>
@@ -105,6 +105,7 @@
                                         <th>Position</th>
                                         <th>Team</th>
                                         <th>Certification</th>
+                                        <th>Proficiency</th>
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -116,25 +117,25 @@
                                             <td>{{ assignment.role }}</td>
                                             <td>{{ assignment.official.team.name }}</td>
                                             <td>{% if assignment.official.certification %}{{ assignment.official.certification.name }}{% else %}<span class="text-muted">None</span>{% endif %}</td>
+                                            <td>{{ assignment.official.get_proficiency_display }}</td>
                                             <td>
-                                                {% if assignment.status == 'confirmed' %}
+                                                {% if assignment.confirmed %}
                                                     <span class="badge bg-success">Confirmed</span>
-                                                {% elif assignment.status == 'tentative' %}
-                                                    <span class="badge bg-warning text-dark">Tentative</span>
-                                                {% elif assignment.status == 'declined' %}
-                                                    <span class="badge bg-danger">Declined</span>
-                                                {% elif assignment.status == 'pending' %}
-                                                    <span class="badge bg-secondary">Pending</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Unconfirmed</span>
                                                 {% endif %}
                                             </td>
                                             <td>
                                                 <div class="btn-group btn-group-sm" role="group">
-                                                    <a href="{% url 'assignment_detail' assignment.id %}" class="btn btn-outline-primary">
-                                                        <i class="fas fa-eye"></i>
-                                                    </a>
                                                     <a href="{% url 'assignment_update' assignment.id %}" class="btn btn-outline-secondary">
                                                         <i class="fas fa-edit"></i>
                                                     </a>
+                                                    <form method="post" action="{% url 'assignment_toggle_confirm' assignment.id %}" class="d-inline">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn {% if assignment.confirmed %}btn-success{% else %}btn-outline-success{% endif %}" title="Confirm/Unconfirm">
+                                                            <i class="fas fa-check"></i>
+                                                        </button>
+                                                    </form>
                                                     <a href="{% url 'assignment_delete' assignment.id %}" class="btn btn-outline-danger">
                                                         <i class="fas fa-trash-alt"></i>
                                                     </a>

@@ -71,6 +71,7 @@ urlpatterns = [
     path('assignments/create/<int:meet_id>/', views.assignment_create, name='assignment_create_for_meet'),
     path('assignments/<int:pk>/update/', views.assignment_update, name='assignment_update'),
     path('assignments/<int:pk>/delete/', views.assignment_delete, name='assignment_delete'),
+    path('assignments/<int:pk>/toggle-confirm/', views_meets.toggle_assignment_confirm, name='assignment_toggle_confirm'),
     
     # Event URLs
     path('events/', views_events.EventListView.as_view(), name='event-list'),

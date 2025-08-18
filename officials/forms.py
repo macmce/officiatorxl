@@ -194,12 +194,164 @@ class MeetForm(forms.ModelForm):
 
 class AssignmentForm(forms.ModelForm):
     """Form for creating and updating assignments."""
+    # Extra fields for create flow
+    new_official_name = forms.CharField(
+        required=False,
+        label='New Official Name',
+        widget=forms.TextInput(attrs={'placeholder': 'Enter new official name'})
+    )
+    new_official_email = forms.EmailField(
+        required=False,
+        label='Email',
+        widget=forms.EmailInput(attrs={'placeholder': 'name@example.com'})
+    )
+    new_official_phone = forms.CharField(
+        required=False,
+        label='Phone',
+        widget=forms.TextInput(attrs={'placeholder': 'e.g., (555) 555-5555'})
+    )
+    new_official_team = forms.ModelChoiceField(
+        queryset=Team.objects.none(),
+        required=False,
+        label='Team',
+        widget=forms.Select()
+    )
+    new_official_active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Active'
+    )
+    new_official_proficiency = forms.ChoiceField(
+        choices=Official.PROFICIENCY_CHOICES,
+        required=False,
+        label='Proficiency'
+    )
+    new_official_certification = forms.ModelChoiceField(
+        queryset=Certification.objects.all().order_by('level', 'name'),
+        required=False,
+        label='Certification'
+    )
     class Meta:
         model = Assignment
         fields = ['meet', 'official', 'role', 'notes', 'confirmed']
         widgets = {
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Make 'role' a dropdown of certifications
+        cert_qs = Certification.objects.all().order_by('level', 'name')
+        # Use ModelChoiceField but map back to string via clean_role
+        self.fields['role'] = forms.ModelChoiceField(
+            queryset=cert_qs,
+            required=True,
+            label='Certification',
+            widget=forms.Select()
+        )
+
+        # Preselect current certification if role matches a certification name or abbreviation
+        current_role = None
+        try:
+            if self.instance and self.instance.pk and self.instance.role:
+                current_role = self.instance.role
+        except Exception:
+            current_role = None
+        if current_role:
+            matched = cert_qs.filter(name=current_role).first() or cert_qs.filter(abbreviation=current_role).first()
+            if matched:
+                self.initial['role'] = matched.pk
+
+        # When updating, do not allow changing confirmed, meet, or official
+        if self.instance and self.instance.pk:
+            # Rename the role field label for Update screen
+            self.fields['role'].label = 'Certification'
+            # Add a proficiency selector for the assigned official (update only)
+            try:
+                current_prof = getattr(self.instance.official, 'proficiency', None)
+            except Exception:
+                current_prof = None
+            self.fields['official_proficiency'] = forms.ChoiceField(
+                choices=Official.PROFICIENCY_CHOICES,
+                required=False,
+                label='Proficiency',
+                initial=current_prof,
+                widget=forms.Select()
+            )
+            for fname in ['meet', 'official', 'confirmed']:
+                if fname in self.fields:
+                    self.fields[fname].disabled = True
+        else:
+            # Creating: if an official is present, default role to their certification
+            official_id = None
+            try:
+                official_id = self.initial.get('official') or self.data.get('official')
+            except Exception:
+                official_id = None
+            if official_id:
+                try:
+                    official_obj = Official.objects.get(pk=official_id)
+                    if official_obj.certification:
+                        matched = cert_qs.filter(pk=official_obj.certification_id).first()
+                        if matched:
+                            self.initial['role'] = matched.pk
+                except (Official.DoesNotExist, ValueError, TypeError):
+                    pass
+            # Create screen: make meet and confirmed read-only as well
+            for fname in ['meet', 'confirmed']:
+                if fname in self.fields:
+                    self.fields[fname].disabled = True
+            # Allow create to omit 'official' if providing a new name
+            if 'official' in self.fields:
+                self.fields['official'].required = False
+            # Role (Certification) will only be required if selecting an existing official
+            self.fields['role'].required = False
+
+    def clean_role(self):
+        """Map selected Certification to the string stored in Assignment.role.
+        When creating a new official, this field may be empty; we'll use
+        new_official_certification instead in the view.
+        """
+        cert = self.cleaned_data.get('role')
+        instance_exists = bool(getattr(self.instance, 'pk', None))
+        new_name = (self.data.get('new_official_name') or '').strip()
+        official_id = self.data.get('official')
+        # If updating, or if an existing official is selected, require role
+        if instance_exists or (official_id and not new_name):
+            if cert is None:
+                raise ValidationError('Please select a certification.')
+            self.selected_certification = cert
+            return cert.name
+        # New-official path: allow role to be empty here; handled via new_official_certification
+        self.selected_certification = None
+        return ''
+
+    def clean(self):
+        cleaned = super().clean()
+        # On create, either an existing official or a new name must be provided
+        instance_exists = bool(getattr(self.instance, 'pk', None))
+        if not instance_exists:
+            official = cleaned.get('official')
+            new_name = (cleaned.get('new_official_name') or '').strip()
+            if official and new_name:
+                raise ValidationError('Please either select an existing official or enter a new official, not both.')
+            if not official and not new_name:
+                raise ValidationError('Select an existing official or enter a new official name.')
+            if not official and new_name:
+                # Require full new-official details
+                # Team is mandatory for Official model
+                if not cleaned.get('new_official_team'):
+                    self.add_error('new_official_team', 'Team is required for a new official.')
+                if not cleaned.get('new_official_certification'):
+                    self.add_error('new_official_certification', 'Certification is required for a new official.')
+                # Proficiency optional defaults handled in view if omitted
+                # Email/phone optional
+                # Active defaults to True if omitted
+            if official and not new_name:
+                # Existing official path requires role (certification)
+                if not cleaned.get('role'):
+                    self.add_error('role', 'Certification is required when selecting an existing official.')
+        return cleaned
 
 
 class EventFilterForm(forms.Form):
