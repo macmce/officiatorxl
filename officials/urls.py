@@ -63,6 +63,9 @@ urlpatterns = [
     path('meets/create/step3/', views_meets.meet_create_step3, name='meet_create_step3'),
     path('meets/<int:pk>/update/', views.meet_update, name='meet_update'),
     path('meets/<int:pk>/delete/', views.meet_delete, name='meet_delete'),
+    path('meets/<int:pk>/configure/', views_meets.meet_configure, name='meet_configure'),
+    path('meets/<int:pk>/configure/proceed/', views_meets.meet_configure_proceed, name='meet_configure_proceed'),
+    path('meets/<int:pk>/configure/build/', views_meets.meet_build_schedule, name='meet_build_schedule'),
     
     # Assignment URLs
     path('assignments/', views.assignment_list, name='assignment_list'),
@@ -71,10 +74,11 @@ urlpatterns = [
     path('assignments/create/<int:meet_id>/', views.assignment_create, name='assignment_create_for_meet'),
     path('assignments/<int:pk>/update/', views.assignment_update, name='assignment_update'),
     path('assignments/<int:pk>/delete/', views.assignment_delete, name='assignment_delete'),
+    path('assignments/<int:pk>/toggle-confirm/', views_meets.toggle_assignment_confirm, name='assignment_toggle_confirm'),
     
-    # Event URLs
-    path('events/', views_events.EventListView.as_view(), name='event-list'),
-    path('events/<int:pk>/', views_events.EventDetailView.as_view(), name='event-detail'),
+    # Event URLs (use underscore names to avoid DRF name collision)
+    path('events/', views_events.EventListView.as_view(), name='event_list'),
+    path('events/<int:pk>/', views_events.EventDetailView.as_view(), name='event_detail'),
     path('events/new/', views_events.EventCreateView.as_view(), name='event-create'),
     path('events/<int:pk>/edit/', views_events.EventUpdateView.as_view(), name='event-update'),
     path('events/<int:pk>/delete/', views_events.EventDeleteView.as_view(), name='event-delete'),

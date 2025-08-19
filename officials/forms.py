@@ -1,4 +1,5 @@
 from django import forms
+import datetime
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory, modelformset_factory
 
@@ -76,15 +77,41 @@ class OfficialForm(forms.ModelForm):
         }
 
 
+class PoolSelectWidget(forms.Select):
+    """Custom widget for pool selection that includes address data in options."""
+    
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if value and value != '':
+            try:
+                # Handle ModelChoiceIteratorValue objects
+                if hasattr(value, 'value'):
+                    pool_id = value.value
+                else:
+                    pool_id = value
+                
+                from .models import Pool
+                pool = Pool.objects.get(pk=pool_id)
+                option['attrs']['data-address'] = pool.address or ''
+            except (Pool.DoesNotExist, ValueError, TypeError):
+                option['attrs']['data-address'] = ''
+        else:
+            option['attrs']['data-address'] = ''
+        return option
+
+
 class MeetForm(forms.ModelForm):
     """Form for creating and updating meets."""
     class Meta:
         model = Meet
-        fields = ['league', 'division', 'date', 'host_team', 'pool', 'name', 'meet_type', 'participating_teams']
+        fields = ['league', 'division', 'date', 'start_time', 'host_team', 'pool', 'name', 'meet_type', 'strategy', 'participating_teams']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time'}),
             'meet_type': forms.Select(),
             'name': forms.TextInput(attrs={'placeholder': 'Enter meet name'}),
+            'pool': PoolSelectWidget(),
+            'strategy': forms.Select(attrs={'class': 'form-select'}),
         }
         
     def __init__(self, *args, **kwargs):
@@ -94,6 +121,24 @@ class MeetForm(forms.ModelForm):
         
         # Make name field required
         self.fields['name'].required = True
+
+        # Strategy field setup (optional for tests; model allows null/blank)
+        self.fields['strategy'].queryset = Strategy.objects.all()
+        self.fields['strategy'].required = False
+        # Do not allow an empty selection in the dropdown
+        try:
+            self.fields['strategy'].empty_label = None
+        except Exception:
+            pass
+        
+        # If only one league exists and none provided, preload it
+        if not self.data.get('league') and not getattr(self.instance, 'league_id', None):
+            league_qs = League.objects.all()
+            if league_qs.count() == 1:
+                only_league = league_qs.first()
+                self.initial['league'] = only_league.id
+                # Set division queryset to this league since league is preselected
+                self.fields['division'].queryset = Division.objects.filter(league=only_league)
         
         # Set division queryset based on league
         if self.instance and self.instance.pk and self.instance.league:
@@ -113,6 +158,22 @@ class MeetForm(forms.ModelForm):
         # Set division field properties
         self.fields['division'].empty_label = "Select a division"
         self.fields['division'].required = False  # Allow optional division
+        
+        # Default start time to 08:30 if not provided
+        if not self.initial.get('start_time') and not self.data.get('start_time'):
+            self.fields['start_time'].initial = datetime.time(8, 30)
+        # Allow omission of start_time; model has a default
+        self.fields['start_time'].required = False
+        
+        # Default date to the next Saturday if not provided
+        if not self.initial.get('date') and not self.data.get('date'):
+            today = datetime.date.today()
+            # Saturday = 5 (Mon=0..Sun=6)
+            days_ahead = (5 - today.weekday()) % 7
+            if days_ahead == 0:
+                days_ahead = 7
+            next_saturday = today + datetime.timedelta(days=days_ahead)
+            self.fields['date'].initial = next_saturday
         
     def clean(self):
         cleaned_data = super().clean()
@@ -135,12 +196,134 @@ class MeetForm(forms.ModelForm):
 
 class AssignmentForm(forms.ModelForm):
     """Form for creating and updating assignments."""
+    # Extra fields for create flow
+    new_official_name = forms.CharField(
+        required=False,
+        label='New Official Name',
+        widget=forms.TextInput(attrs={'placeholder': 'Enter new official name'})
+    )
+    new_official_email = forms.EmailField(
+        required=False,
+        label='Email',
+        widget=forms.EmailInput(attrs={'placeholder': 'name@example.com'})
+    )
+    new_official_phone = forms.CharField(
+        required=False,
+        label='Phone',
+        widget=forms.TextInput(attrs={'placeholder': 'e.g., (555) 555-5555'})
+    )
+    new_official_team = forms.ModelChoiceField(
+        queryset=Team.objects.none(),
+        required=False,
+        label='Team',
+        widget=forms.Select()
+    )
+    new_official_active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Active'
+    )
+    new_official_proficiency = forms.ChoiceField(
+        choices=Official.PROFICIENCY_CHOICES,
+        required=False,
+        label='Proficiency'
+    )
+    new_official_certification = forms.ModelChoiceField(
+        queryset=Certification.objects.all().order_by('level', 'name'),
+        required=False,
+        label='Certification'
+    )
     class Meta:
         model = Assignment
         fields = ['meet', 'official', 'role', 'notes', 'confirmed']
         widgets = {
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # When updating, do not allow changing confirmed, meet, or official
+        if self.instance and self.instance.pk:
+            # Add a proficiency selector for the assigned official (update only)
+            try:
+                current_prof = getattr(self.instance.official, 'proficiency', None)
+            except Exception:
+                current_prof = None
+            self.fields['official_proficiency'] = forms.ChoiceField(
+                choices=Official.PROFICIENCY_CHOICES,
+                required=False,
+                label='Proficiency',
+                initial=current_prof,
+                widget=forms.Select()
+            )
+            for fname in ['meet', 'official', 'confirmed']:
+                if fname in self.fields:
+                    self.fields[fname].disabled = True
+        else:
+            # Creating: if an official is present, default role to their certification
+            official_id = None
+            try:
+                official_id = self.initial.get('official') or self.data.get('official')
+            except Exception:
+                official_id = None
+            if official_id:
+                try:
+                    official_obj = Official.objects.get(pk=official_id)
+                    if official_obj.certification and 'role' in self.fields:
+                        # Pre-fill role text with certification name
+                        self.initial['role'] = official_obj.certification.name
+                except (Official.DoesNotExist, ValueError, TypeError):
+                    pass
+            # Create screen: make confirmed read-only; allow selecting meet in general create
+            if 'confirmed' in self.fields:
+                self.fields['confirmed'].disabled = True
+            # Allow create to omit 'official' if providing a new name
+            if 'official' in self.fields:
+                self.fields['official'].required = False
+            # Role will only be required if selecting an existing official
+            if 'role' in self.fields:
+                self.fields['role'].required = False
+
+    def clean_role(self):
+        """Validate role as plain text. When creating a new official, allow empty."""
+        role_val = self.cleaned_data.get('role', '')
+        instance_exists = bool(getattr(self.instance, 'pk', None))
+        new_name = (self.data.get('new_official_name') or '').strip()
+        official_id = self.data.get('official')
+        # If updating, or if an existing official is selected, require non-empty role string
+        if instance_exists or (official_id and not new_name):
+            if not role_val:
+                raise ValidationError('Please enter a certification/role.')
+            return role_val
+        # New-official path: role may be empty; will be inferred from new_official_certification in the view
+        return role_val or ''
+
+    def clean(self):
+        cleaned = super().clean()
+        # On create, either an existing official or a new name must be provided
+        instance_exists = bool(getattr(self.instance, 'pk', None))
+        if not instance_exists:
+            official = cleaned.get('official')
+            new_name = (cleaned.get('new_official_name') or '').strip()
+            if official and new_name:
+                raise ValidationError('Please either select an existing official or enter a new official, not both.')
+            if not official and not new_name:
+                raise ValidationError('Select an existing official or enter a new official name.')
+            if not official and new_name:
+                # Require full new-official details
+                # Team is mandatory for Official model
+                if not cleaned.get('new_official_team'):
+                    self.add_error('new_official_team', 'Team is required for a new official.')
+                if not cleaned.get('new_official_certification'):
+                    self.add_error('new_official_certification', 'Certification is required for a new official.')
+                # Proficiency optional defaults handled in view if omitted
+                # Email/phone optional
+                # Active defaults to True if omitted
+            if official and not new_name:
+                # Existing official path requires role (certification)
+                if not cleaned.get('role'):
+                    self.add_error('role', 'Certification is required when selecting an existing official.')
+        return cleaned
 
 
 class EventFilterForm(forms.Form):
@@ -251,16 +434,6 @@ class PositionImportForm(forms.Form):
             if not file.name.endswith(('.xlsx', '.csv')):
                 raise forms.ValidationError('Invalid file type. Only .xlsx and .csv files are allowed.')
         return file
-
-
-class PoolForm(forms.ModelForm):
-    """Form for creating and updating pools."""
-    class Meta:
-        model = Pool
-        fields = ['name', 'address', 'length', 'units', 'lanes', 'bidirectional']
-        widgets = {
-            'address': forms.Textarea(attrs={'rows': 3}),
-        }
 
 
 # Create a formset for managing pools within a team

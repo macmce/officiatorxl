@@ -3,9 +3,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from .models import Meet, Assignment, Team, Official, League, Pool
+from .models import Meet, Assignment, Team, Official, League, Pool, MeetSchedule
 from .forms import MeetForm, AssignmentForm
 from datetime import datetime
+from django.utils import timezone
 
 
 # Meet views
@@ -35,12 +36,31 @@ def meet_detail(request, pk):
         return redirect('meet_list')
     
     assignments = meet.assignments.all().select_related('official')
+    # Eligible referees: confirmed assignments with role containing 'referee'
+    eligible_referees = (
+        meet.assignments.filter(confirmed=True, role__icontains='referee')
+        .select_related('official')
+        .order_by('official__name')
+    )
+    # Resolve Meet Referee to display in Meet Info
+    meet_referee = None
+    try:
+        selected_ref_id = request.session.get(f'meet_{meet.id}_referee_official_id')
+        if selected_ref_id:
+            meet_referee = Official.objects.filter(id=selected_ref_id).first()
+        elif eligible_referees.count() == 1:
+            meet_referee = eligible_referees.first().official
+    except Exception:
+        meet_referee = None
     participating_teams = meet.participating_teams.all()
     
     return render(request, 'officials/meet_detail.html', {
         'meet': meet,
         'assignments': assignments,
         'participating_teams': participating_teams,
+        'eligible_referees': eligible_referees,
+        'meet_referee': meet_referee,
+        'schedules': getattr(meet, 'schedules', None) and meet.schedules.all() or [],
     })
 
 
@@ -75,6 +95,12 @@ def meet_create_step1(request):
                 'participating_teams': [team.name for team in form.cleaned_data['participating_teams']],
                 'auto_generated_name': auto_generated, # Store whether name was auto-generated
             }
+            # Persist division from form, if provided
+            if form.cleaned_data.get('division'):
+                request.session['meet_step1_data']['division_id'] = form.cleaned_data['division'].id
+                request.session['meet_step1_data']['division_name'] = form.cleaned_data['division'].name
+            else:
+                request.session['meet_step1_data']['division_id'] = None
             
             # Host team is optional for non-dual meets
             if form.cleaned_data.get('host_team'):
@@ -120,34 +146,33 @@ def meet_create_step2(request):
     
     # Create a partial form for step 2 (pool selection)
     if request.method == 'POST':
-        # Create a form and validate it
-        form = MeetForm(request.POST)
+        # Do not validate the entire MeetForm here; only process the pool field
+        pool_id = request.POST.get('pool')
+        pool = None
+        if pool_id:
+            try:
+                pool = Pool.objects.get(id=pool_id)
+            except Pool.DoesNotExist:
+                messages.error(request, 'Selected pool does not exist.')
+                # fall through to render the form again
         
-        # We can perform a partial validation for just the pool field
-        # But first we need to ensure the form has been validated
-        if form.is_valid() or (hasattr(form, 'cleaned_data') and 'pool' in form.cleaned_data):
-            pool = form.cleaned_data.get('pool')
-            
-            # Store step 2 data in session
-            request.session['meet_step2_data'] = {
-                'pool_id': pool.id if pool else None,
-                'pool': pool.name if pool else None,
+        # Store step 2 data in session regardless (pool is optional)
+        request.session['meet_step2_data'] = {
+            'pool_id': pool.id if pool else None,
+            'pool': pool.name if pool else None,
+        }
+        
+        if pool:
+            request.session['meet_step2_data']['pool_details'] = {
+                'address': pool.address,
+                'length': pool.length,
+                'units': pool.units,
+                'lanes': pool.lanes,
+                'bidirectional': pool.bidirectional,
             }
-            
-            # If pool is selected, store additional pool details
-            if pool:
-                request.session['meet_step2_data']['pool_details'] = {
-                    'address': pool.address,
-                    'length': pool.length,
-                    'units': pool.units,
-                    'lanes': pool.lanes,
-                    'bidirectional': pool.bidirectional,
-                }
-            
-            # TODO: If weather API is implemented, store weather data here
-            
-            # Proceed to step 3
-            return redirect('meet_create_step3')
+        
+        # Proceed to step 3
+        return redirect('meet_create_step3')
     else:
         # Initialize the form for step 2
         form = MeetForm()
@@ -207,6 +232,7 @@ def meet_create_step3(request):
         # Time to save the meet
         try:
             # Get the objects from their IDs
+            logger.info("[Step3] meet_data: %s", meet_data)
             league = League.objects.get(id=meet_data['league_id'])
             
             # Check if user has permission to add meet to this league
@@ -221,6 +247,9 @@ def meet_create_step3(request):
                 name=meet_data['name'],
                 meet_type=meet_data['meet_type']
             )
+            # Set division if captured in step 1
+            if meet_data.get('division_id'):
+                meet.division_id = meet_data.get('division_id')
             
             # Set host team if it exists
             if meet_data['host_team_id']:
@@ -229,15 +258,21 @@ def meet_create_step3(request):
             
             # Set pool if it exists
             if meet_data.get('pool_id'):
+                logger.info("[Step3] Setting pool_id=%s", meet_data.get('pool_id'))
                 pool = Pool.objects.get(id=meet_data['pool_id'])
                 meet.pool = pool
             
             # Save the meet
             meet.save()
+            logger.info("[Step3] Saved Meet id=%s pool_id=%s", meet.id, meet.pool_id)
             
             # Add participating teams
             participating_teams = Team.objects.filter(id__in=meet_data['participating_teams_ids'])
             meet.participating_teams.set(participating_teams)
+            # Auto-assign officials from participating teams
+            created_count = _auto_assign_participating_officials(meet)
+            if created_count:
+                messages.info(request, f"Auto-assigned {created_count} officials to this meet.")
             
             # Store weather data if available (would be stored as JSON)
             # if 'weather' in meet_data:
@@ -265,6 +300,40 @@ def meet_create_step3(request):
 import logging
 logger = logging.getLogger(__name__)
 
+def _auto_assign_participating_officials(meet: Meet):
+    """Assign all officials from participating teams to the given meet.
+    Creates an Assignment per official with a default role and an auto-generated note.
+    Safe to call multiple times; uses get_or_create to avoid duplicates.
+    """
+    try:
+        participating_teams = meet.participating_teams.all()
+        if not participating_teams.exists():
+            return 0
+        officials = Official.objects.filter(team__in=participating_teams).distinct()
+        created_count = 0
+        for official in officials:
+            # Use the official's certification name if available; else a generic default
+            role_label = 'Official'
+            try:
+                if getattr(official, 'certification_id', None):
+                    role_label = official.certification.name
+            except Exception:
+                role_label = 'Official'
+            assignment, created = Assignment.objects.get_or_create(
+                meet=meet,
+                official=official,
+                role=role_label,
+                defaults={
+                    'notes': 'Auto-assigned when the meet was created.'
+                }
+            )
+            if created:
+                created_count += 1
+        return created_count
+    except Exception as e:
+        logger.error(f"Auto-assign failed for meet {meet.id}: {e}")
+        return 0
+
 def meet_create(request):
     """
     Handle meet creation - simplified to pass test_meet_create_view.
@@ -283,6 +352,15 @@ def meet_create(request):
         logger.info(f"POST data: {request.POST}")
         
         try:
+            # Validate the form first to enforce required fields like strategy
+            form = MeetForm(request.POST)
+            if not form.is_valid():
+                logger.warning(f"Form errors: {form.errors}")
+                return render(request, 'officials/meet_form.html', {
+                    'form': form,
+                    'title': 'Create Meet',
+                }, status=200)
+            
             # Skip form validation and create Meet directly
             # This guarantees persistence without relying on form saving behavior
             meet = Meet(
@@ -293,6 +371,14 @@ def meet_create(request):
                 pool_id=request.POST.get('pool'),
                 meet_type=request.POST.get('meet_type')
             )
+            # Save division if provided
+            division_id = request.POST.get('division')
+            if division_id:
+                meet.division_id = division_id
+            # Save strategy if provided (required by form validation)
+            strategy_id = request.POST.get('strategy')
+            if strategy_id:
+                meet.strategy_id = strategy_id
             
             # Force save
             meet.save()
@@ -304,6 +390,10 @@ def meet_create(request):
                 for team_id in team_ids:
                     meet.participating_teams.add(team_id)
                 logger.info(f"Added {len(team_ids)} participating teams")
+            # Auto-assign officials from participating teams
+            created_count = _auto_assign_participating_officials(meet)
+            if created_count:
+                messages.info(request, f"Auto-assigned {created_count} officials to this meet.")
             
             # Verify persistence by forcing a database lookup
             try:
@@ -312,20 +402,11 @@ def meet_create(request):
             except Meet.DoesNotExist:
                 logger.error("ERROR: Meet not found after save!")
             
-            # Also process form for proper rendering
-            form = MeetForm(request.POST)
-            if form.is_valid():
-                logger.info("Form is valid")
-            else:
-                logger.warning(f"Form errors: {form.errors} - but Meet still created directly")
+            logger.info("Form is valid")
             
-            # Return 200 with template for step 2
-            context = {
-                'form': form if form.is_valid() else None,
-                'title': 'Create Meet - Step 2',
-                'meet': meet,
-            }
-            return render(request, 'officials/meet_form.html', context, status=200)
+            # Redirect to meet detail after successful creation
+            messages.success(request, f'Meet "{meet.name}" created successfully!')
+            return redirect('meet_detail', pk=meet.pk)
         
         except Exception as e:
             # Catch any errors to ensure the view doesn't get interrupted
@@ -454,25 +535,103 @@ def assignment_create(request, meet_id=None):
     
     # Pre-select meet if coming from meet detail page
     initial_data = {}
+    preselected_meet = None
     if meet_id:
-        meet = get_object_or_404(Meet, pk=meet_id)
-        if request.user.leagues.filter(id=meet.league.id).exists() or request.user.is_staff:
-            initial_data['meet'] = meet
+        preselected_meet = get_object_or_404(Meet, pk=meet_id)
+        if request.user.leagues.filter(id=preselected_meet.league.id).exists() or request.user.is_staff:
+            initial_data['meet'] = preselected_meet
+    else:
+        # Support preselecting via query param: /assignments/create/?meet=<id>
+        meet_qs = request.GET.get('meet')
+        if meet_qs:
+            try:
+                preselected_meet = get_object_or_404(Meet, pk=int(meet_qs))
+                if request.user.leagues.filter(id=preselected_meet.league.id).exists() or request.user.is_staff:
+                    initial_data['meet'] = preselected_meet
+            except (ValueError, TypeError):
+                preselected_meet = None
     
     if request.method == 'POST':
-        form = AssignmentForm(request.POST)
+        form = AssignmentForm(request.POST, initial=initial_data)
+        # Ensure new_official_team queryset is set for re-rendering on errors
+        if not request.user.is_staff:
+            accessible_teams = Team.objects.filter(division__league__in=user_leagues)
+            if 'new_official_team' in form.fields:
+                form.fields['new_official_team'].queryset = accessible_teams
+        else:
+            if 'new_official_team' in form.fields:
+                form.fields['new_official_team'].queryset = Team.objects.all()
+        # If meet is known, limit new_official_team to participating teams
+        if preselected_meet and 'new_official_team' in form.fields:
+            form.fields['new_official_team'].queryset = preselected_meet.participating_teams.all()
+        # Filter officials to participating teams that are not yet assigned to this meet
+        meet_for_filter = preselected_meet
+        if meet_for_filter and 'official' in form.fields:
+            participating = preselected_meet.participating_teams.all()
+            available_officials = Official.objects.filter(team__in=participating)
+            form.fields['official'].queryset = available_officials
+        elif not request.user.is_staff and 'official' in form.fields:
+            # General create (no preselected meet): show officials from user's leagues
+            form.fields['official'].queryset = Official.objects.filter(team__division__league__in=user_leagues)
         if form.is_valid():
             assignment = form.save(commit=False)
-            
-            # Check if user has permission to add assignment to this meet
-            if not request.user.leagues.filter(id=assignment.meet.league.id).exists() and not request.user.is_staff:
+
+            # Ensure meet is set (disabled field won't submit). Prefer preselected meet if present
+            meet_obj = preselected_meet or form.cleaned_data.get('meet')
+            if not meet_obj:
+                messages.error(request, 'A meet must be specified for this assignment.')
+                return redirect('assignment_list')
+
+            # Permission check based on the final meet
+            if not request.user.leagues.filter(id=meet_obj.league.id).exists() and not request.user.is_staff:
                 messages.error(request, 'You do not have permission to add assignments to this meet.')
                 return redirect('assignment_list')
-            
-            # Check if this official has the necessary certification
-            if assignment.official.certification is None:
+
+            # Determine official: existing selection or create new, and pick certification for assignment
+            assignment_role_name = assignment.role  # may be '' in new official path
+            official_obj = form.cleaned_data.get('official')
+            new_name = (form.cleaned_data.get('new_official_name') or '').strip()
+            if not official_obj and new_name:
+                # Create a new Official with full details
+                cert_obj = form.cleaned_data.get('new_official_certification')
+                team_obj = form.cleaned_data.get('new_official_team')
+                email = form.cleaned_data.get('new_official_email') or ''
+                phone = form.cleaned_data.get('new_official_phone') or ''
+                active = bool(form.cleaned_data.get('new_official_active'))
+                prof = form.cleaned_data.get('new_official_proficiency') or 'Beginner'
+                official_obj = Official(
+                    name=new_name,
+                    email=email,
+                    phone=phone,
+                    certification=cert_obj,
+                    team=team_obj,
+                    active=active,
+                    proficiency=prof,
+                )
+                official_obj.save()
+                # Use this certification for the assignment role label
+                if cert_obj:
+                    assignment_role_name = cert_obj.name
+            else:
+                # Existing official path: role was cleaned from the form's 'role' field
+                cert_obj = getattr(form, 'selected_certification', None)
+                if cert_obj:
+                    assignment_role_name = cert_obj.name
+
+            # Finalize assignment fields
+            assignment.meet = meet_obj
+            if official_obj:
+                assignment.official = official_obj
+            # Set assignment role explicitly (covers new-official path)
+            if assignment_role_name:
+                assignment.role = assignment_role_name
+            # confirmed is read-only on create; default to False
+            assignment.confirmed = False
+
+            # Warn if official has no certification
+            if not getattr(assignment.official, 'certification_id', None):
                 messages.warning(request, f'Note: {assignment.official.name} has no certification.')
-            
+
             try:
                 assignment.save()
                 messages.success(request, f'Assignment for {assignment.official.name} created successfully!')
@@ -486,13 +645,34 @@ def assignment_create(request, meet_id=None):
             accessible_meets = Meet.objects.filter(league__in=user_leagues)
             form.fields['meet'].queryset = accessible_meets
             
-            # Get officials that belong to teams in the user's leagues
-            accessible_officials = Official.objects.filter(team__division__league__in=user_leagues)
-            form.fields['official'].queryset = accessible_officials
+            # If a meet is preselected, filter officials to participating teams not already assigned
+            if preselected_meet and 'official' in form.fields:
+                participating = preselected_meet.participating_teams.all()
+                available_officials = Official.objects.filter(team__in=participating)
+                form.fields['official'].queryset = available_officials
+            else:
+                # General create: show officials from user's leagues
+                form.fields['official'].queryset = Official.objects.filter(team__division__league__in=user_leagues)
+        else:
+            # Staff can choose any team
+            if 'new_official_team' in form.fields:
+                form.fields['new_official_team'].queryset = Team.objects.all()
+        # For staff as well, scope officials by preselected meet if available
+        if request.user.is_staff and preselected_meet and 'official' in form.fields:
+            participating = preselected_meet.participating_teams.all()
+            available_officials = Official.objects.filter(team__in=participating)
+            form.fields['official'].queryset = available_officials
+        # Limit new_official_team to participating teams if we know the meet; else empty
+        if 'new_official_team' in form.fields:
+            if preselected_meet:
+                form.fields['new_official_team'].queryset = preselected_meet.participating_teams.all()
+            else:
+                form.fields['new_official_team'].queryset = Team.objects.none()
     
     return render(request, 'officials/assignment_form.html', {
         'form': form,
         'title': 'Create Assignment',
+        'preselected_meet': preselected_meet,
     })
 
 
@@ -509,7 +689,21 @@ def assignment_update(request, pk):
     if request.method == 'POST':
         form = AssignmentForm(request.POST, instance=assignment)
         if form.is_valid():
-            form.save()
+            # Save role (certification) explicitly to ensure persistence
+            updated = form.save(commit=False)
+            new_role = form.cleaned_data.get('role')
+            if new_role:
+                updated.role = new_role
+            updated.save()
+            # Persist proficiency changes for the assigned official if provided
+            try:
+                new_prof = form.cleaned_data.get('official_proficiency')
+            except Exception:
+                new_prof = None
+            if new_prof and hasattr(assignment, 'official'):
+                if getattr(assignment.official, 'proficiency', None) != new_prof:
+                    assignment.official.proficiency = new_prof
+                    assignment.official.save(update_fields=['proficiency'])
             messages.success(request, f'Assignment for {assignment.official.name} updated successfully!')
             return redirect('meet_detail', pk=assignment.meet.pk)
     else:
@@ -551,3 +745,170 @@ def assignment_delete(request, pk):
     return render(request, 'officials/assignment_confirm_delete.html', {
         'assignment': assignment,
     })
+
+
+@login_required
+def toggle_assignment_confirm(request, pk):
+    """Toggle the confirmed flag on an assignment and redirect back to meet detail."""
+    assignment = get_object_or_404(Assignment, pk=pk)
+    # Permission: user must have access to the assignment's league unless staff
+    if not request.user.leagues.filter(id=assignment.meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to modify this assignment.')
+        return redirect('meet_detail', pk=assignment.meet.pk)
+    if request.method == 'POST':
+        # Proceed to toggle without certification check
+        assignment.confirmed = not assignment.confirmed
+        assignment.save(update_fields=['confirmed'])
+        if assignment.confirmed:
+            messages.success(request, f'{assignment.official.name} confirmed for this meet.')
+        else:
+            messages.info(request, f'{assignment.official.name} unconfirmed for this meet.')
+    else:
+        messages.error(request, 'Invalid request method.')
+    return redirect('meet_detail', pk=assignment.meet.pk)
+
+
+@login_required
+def meet_configure(request, pk):
+    """Display the Configure Meet page with basic meet information."""
+    meet = get_object_or_404(Meet, pk=pk)
+    # Permission: user must have access to the meet's league unless staff
+    if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to configure this meet.')
+        return redirect('meet_detail', pk=pk)
+    from datetime import date as _date
+    # Get events for this meet type
+    try:
+        from .models import Event
+        events_qs = Event.objects.filter(meet_type=meet.meet_type).order_by('event_number')
+    except Exception:
+        events_qs = []
+    # Get Event Positions for this meet type and strategy
+    try:
+        from .models import EventPosition
+        if meet.strategy:
+            event_positions_qs = (
+                EventPosition.objects
+                .select_related('event', 'position', 'position__minimum_certification', 'position__strategy')
+                .filter(event__meet_type=meet.meet_type, position__strategy=meet.strategy)
+                .order_by('event__event_number', 'position__role')
+            )
+        else:
+            event_positions_qs = []
+    except Exception:
+        event_positions_qs = []
+    # Get Assignments for this meet (for Officials section), include related official.
+    # Grouping/headers will use Assignment.role (certification stored on the assignment).
+    try:
+        from .models import Assignment
+        assignments_qs = (
+            Assignment.objects
+            .filter(meet=meet)
+            .select_related('official')
+            .order_by('role', 'official__name')
+        )
+    except Exception:
+        assignments_qs = []
+    # Eligible referees for this meet (confirmed role contains 'referee')
+    try:
+        eligible_referees = (
+            meet.assignments.filter(confirmed=True, role__icontains='referee')
+            .select_related('official')
+            .order_by('official__name')
+        )
+    except Exception:
+        eligible_referees = []
+    # Resolve selected meet referee
+    meet_referee = None
+    try:
+        selected_ref_id = request.session.get(f'meet_{meet.id}_referee_official_id')
+        if selected_ref_id:
+            meet_referee = Official.objects.filter(id=selected_ref_id).first()
+        elif hasattr(eligible_referees, 'count') and eligible_referees.count() == 1:
+            meet_referee = eligible_referees.first().official
+    except Exception:
+        meet_referee = None
+    context = {
+        'meet': meet,
+        'today': _date.today(),
+        'events': events_qs,
+        'event_positions': event_positions_qs,
+        'assignments': assignments_qs,
+        'eligible_referees': eligible_referees,
+        'meet_referee': meet_referee,
+        'schedules': getattr(meet, 'schedules', None) and meet.schedules.all() or [],
+    }
+    return render(request, 'officials/meet_configure.html', context)
+
+
+@login_required
+def meet_configure_proceed(request, pk):
+    """When proceeding, delete all unconfirmed assignments for the meet, then go to configure page."""
+    meet = get_object_or_404(Meet, pk=pk)
+    # Permission check
+    if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to configure this meet.')
+        return redirect('meet_detail', pk=pk)
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('meet_detail', pk=pk)
+    # Validate required Meet Referee selection
+    referee_id = request.POST.get('meet_referee_id')
+    if not referee_id:
+        messages.error(request, 'Please select a Meet Referee before proceeding.')
+        return redirect('meet_detail', pk=pk)
+    try:
+        referee_id_int = int(referee_id)
+    except (TypeError, ValueError):
+        messages.error(request, 'Invalid referee selection.')
+        return redirect('meet_detail', pk=pk)
+    # Ensure the selected official is a confirmed Referee assignment for this meet
+    is_valid_ref = Assignment.objects.filter(
+        meet=meet,
+        confirmed=True,
+        official_id=referee_id_int,
+        role__icontains='referee',
+    ).select_related('official').exists()
+    if not is_valid_ref:
+        messages.error(request, 'Selected official is not a confirmed Referee for this meet.')
+        return redirect('meet_detail', pk=pk)
+    # Persist selection in session for later steps (until a model field exists)
+    request.session[f'meet_{meet.id}_referee_official_id'] = referee_id_int
+    messages.success(request, 'Meet Referee selected. Proceeding to configure the meet...')
+    # Delete unconfirmed assignments
+    qs = Assignment.objects.filter(meet=meet, confirmed=False)
+    removed = qs.count()
+    qs.delete()
+    if removed:
+        messages.success(request, f'Removed {removed} unconfirmed assignment(s).')
+    else:
+        messages.info(request, 'No unconfirmed assignments to remove.')
+    return redirect('meet_configure', pk=pk)
+
+
+@login_required
+def meet_build_schedule(request, pk):
+    """Build and persist a meet schedule record with a timestamped name."""
+    meet = get_object_or_404(Meet, pk=pk)
+    # Permission: user must have access to the meet's league unless staff
+    if not request.user.leagues.filter(id=meet.league.id).exists() and not request.user.is_staff:
+        messages.error(request, 'You do not have permission to build a schedule for this meet.')
+        return redirect('meet_detail', pk=pk)
+    if request.method != 'POST':
+        messages.error(request, 'Invalid request method.')
+        return redirect('meet_configure', pk=pk)
+    option = request.POST.get('build_option', 'LIGHTEST').upper()
+    if option not in dict(MeetSchedule.BUILD_CHOICES):
+        option = 'LIGHTEST'
+    timestamp = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    schedule_name = f"{meet.name} - {timestamp}"
+    try:
+        MeetSchedule.objects.create(
+            meet=meet,
+            name=schedule_name,
+            build_option=option,
+        )
+        messages.success(request, f'Schedule "{schedule_name}" created ({option.title()}).')
+    except Exception as e:
+        messages.error(request, f'Failed to create schedule: {e}')
+    return redirect('meet_configure', pk=pk)

@@ -38,17 +38,55 @@
                         </div>
                         
                         <div class="row">
-                            <div class="col-md-12">
+                            <div class="col-md-6">
                                 {{ form.date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.start_time|as_crispy_field }}
                             </div>
                         </div>
                         
+                        <div class="row">
+                            <div class="col-md-12">
+                                {# pool moved below host team #}
+                            </div>
+                        </div>
+                        
+                        
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.meet_type|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12">
+                                {{ form.strategy|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <!-- Participating Teams as checkboxes (replaces multi-select). Keep original select hidden for form submission. -->
+                        <div class="mb-3">
+                            <label class="form-label">Participating Teams</label>
+                            <div id="participating-teams-checkboxes" class="row g-2"></div>
+                            <div class="form-text">For Dual meets, select exactly 2 teams. For Divisional/Invitational, select more than 2.</div>
+                        </div>
+                        <div style="display:none">{{ form.participating_teams }}</div>
+                        
+                        <div class="row" id="host-team-container">
+                            <div class="col-md-12">
+                                {{ form.host_team|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        {# Moved pool field to be after host team and before meet name #}
                         <div class="row">
                             <div class="col-md-12">
                                 {{ form.pool|as_crispy_field }}
                             </div>
                         </div>
                         
+                        <!-- Weather Forecast moved to follow the pool field -->
                         <div class="card mb-3" id="weatherForecast" style="display: none;">
                             <div class="card-header bg-info text-white">
                                 <h5 class="mb-0">Weather Forecast</h5>
@@ -60,21 +98,6 @@
                                     </div>
                                     <div id="weatherData"></div>
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-12">
-                                {{ form.meet_type|as_crispy_field }}
-                            </div>
-                        </div>
-                        
-                        <!-- The participating_teams field is a ManyToManyField and should be handled appropriately by the form -->
-                        {{ form.participating_teams|as_crispy_field }}
-                        
-                        <div class="row" id="host-team-container">
-                            <div class="col-md-12">
-                                {{ form.host_team|as_crispy_field }}
                             </div>
                         </div>
                         
@@ -118,7 +141,8 @@
         const dateInput = document.getElementById('id_date');
         const hostTeamSelect = document.getElementById('id_host_team');
         const meetTypeSelect = document.getElementById('id_meet_type');
-        const participatingTeamsSelect = document.getElementById('id_participating_teams');
+        const participatingTeamsSelect = document.getElementById('id_participating_teams'); // hidden
+        const participatingTeamsContainer = document.getElementById('participating-teams-checkboxes');
         const leagueSelect = document.getElementById('id_league');
         const divisionSelect = document.getElementById('id_division');
         const nameInput = document.getElementById('id_name');
@@ -133,6 +157,20 @@
         const hostTeamContainer = document.getElementById('host-team-container');
         const hostTeamValidationAlert = document.getElementById('host-team-validation-alert');
         const hostTeamValidationMessage = document.getElementById('host-team-validation-message');
+
+        // Auto-name helper
+        function updateAutoName() {
+            // Only set if blank or previously autofilled
+            const shouldSet = !nameInput.value || nameInput.dataset.autofilled === 'true';
+            if (!shouldSet) return;
+            if (!poolSelect.value || !dateInput.value || !meetTypeSelect.value) return;
+            const meetTypeText = (meetTypeSelect.options[meetTypeSelect.selectedIndex]?.textContent || meetTypeSelect.value).trim();
+            const poolName = (poolSelect.options[poolSelect.selectedIndex]?.textContent || '').trim();
+            const dateText = dateInput.value; // YYYY-MM-DD
+            const built = `${meetTypeText} ${dateText} ${poolName}`;
+            nameInput.value = built;
+            nameInput.dataset.autofilled = 'true';
+        }
         
         // Initialize host team field based on current meet type
         updateHostTeamField();
@@ -149,21 +187,111 @@
             // Fetch pools for the selected team
             fetch(`/officials/api/teams/${hostTeamSelect.value}/pools/`)
                 .then(response => response.json())
-                .then(pools => {
-                    pools.forEach(pool => {
+                .then(data => {
+                    // Add new options
+                    data.forEach(pool => {
                         const option = document.createElement('option');
                         option.value = pool.id;
                         option.textContent = pool.name;
-                        option.dataset.address = pool.address;
+                        option.dataset.address = pool.address || '';
                         poolSelect.appendChild(option);
                     });
-                    
-                    // If we're editing and a pool is already selected, get its weather
-                    if (poolSelect.value) {
+
+                    // Re-select previously selected pool if still available
+                    const previouslySelected = poolSelect.getAttribute('data-selected');
+                    if (previouslySelected) {
+                        poolSelect.value = previouslySelected;
+                        poolSelect.removeAttribute('data-selected');
                         getWeatherForecast();
+                    }
+
+                    // If exactly one pool is available, auto-select it
+                    if (!poolSelect.value) {
+                        const options = Array.from(poolSelect.options).filter(o => o.value);
+                        if (options.length === 1) {
+                            poolSelect.value = options[0].value;
+                            poolSelect.dispatchEvent(new Event('change'));
+                        }
                     }
                 })
                 .catch(error => console.error('Error loading pools:', error));
+        }
+        
+        // Function to load pools for NON-dual meets from selected participating teams
+        function loadPoolsForParticipatingTeams() {
+            // Only applies to non-dual
+            if (meetTypeSelect.value === 'dual') return;
+            
+            // Gather selected team IDs
+            const selectedTeams = getSelectedTeamIds();
+            
+            // Clear current options except the empty one
+            const emptyOption = poolSelect.options[0];
+            poolSelect.innerHTML = '';
+            poolSelect.appendChild(emptyOption);
+            
+            if (selectedTeams.length === 0) {
+                return;
+            }
+            
+            const seen = new Set();
+            const promises = selectedTeams.map(teamId =>
+                fetch(`/officials/api/teams/${teamId}/pools/`)
+                    .then(r => r.json())
+                    .then(pools => {
+                        pools.forEach(pool => {
+                            if (seen.has(pool.id)) return;
+                            seen.add(pool.id);
+                            const option = document.createElement('option');
+                            option.value = pool.id;
+                            option.textContent = pool.name;
+                            option.dataset.address = pool.address || '';
+                            poolSelect.appendChild(option);
+                        });
+                    })
+                    .catch(err => console.error('Error loading pools for team', teamId, err))
+            );
+            
+            Promise.all(promises).then(() => {
+                // If a pool is already selected and present, keep it; else no-op
+            });
+        }
+
+        // Pick preferred temperature: 1 PM reading if available, else daily high, else current temperature
+        function pickPreferredTemp(data) {
+            const explicit1pm = (data.forecast_1pm ?? data.temperature_1pm ?? data.temp_1pm);
+            if (explicit1pm !== undefined && explicit1pm !== null) {
+                return { value: explicit1pm, label: '1 PM', source: '1pm' };
+            }
+            const hourly = Array.isArray(data.hourly) ? data.hourly : (Array.isArray(data.hourly_forecast) ? data.hourly_forecast : null);
+            if (hourly) {
+                const match = hourly.find(h => {
+                    const t = (h.time || h.hour || h.timestamp || '').toString();
+                    return /(^|\b)13(:?\:00)?(\b|$)/.test(t) || /1\s*pm/i.test(t);
+                });
+                const tempKey = ['temp', 'temperature', 'temp_f', 'temp_c'].find(k => match && match[k] !== undefined && match[k] !== null);
+                if (match && tempKey) {
+                    return { value: match[tempKey], label: '1 PM', source: '1pm' };
+                }
+            }
+            if (data.by_hour && (data.by_hour['13'] || data.by_hour['13:00'])) {
+                const h = data.by_hour['13'] || data.by_hour['13:00'];
+                const tempKey = ['temp', 'temperature', 'temp_f', 'temp_c'].find(k => h && h[k] !== undefined && h[k] !== null);
+                if (tempKey) return { value: h[tempKey], label: '1 PM', source: '1pm' };
+            }
+            const high = (data.high ?? data.temp_high ?? data.max_temp ?? data.high_temperature);
+            if (high !== undefined && high !== null) {
+                return { value: high, label: 'High', source: 'high' };
+            }
+            return { value: data.temperature, label: 'Current', source: 'current' };
+        }
+
+        // Keep hidden select in sync with visible checkboxes
+        function syncParticipatingTeamsSelect() {
+            const selectedIds = getSelectedTeamIds();
+            Array.from(participatingTeamsSelect.options).forEach(opt => {
+                opt.selected = selectedIds.includes(opt.value);
+            });
         }
         
         // Function to get weather forecast for the selected pool and date
@@ -202,26 +330,43 @@
                         return;
                     }
                     
-                    // Display the weather forecast
+                    // Display the weather forecast with preference for 1 PM or High
+                    const unitsSymbol = data.units === 'imperial' ? 'F' : 'C';
+                    const windUnits = data.units === 'imperial' ? 'mph' : 'kph';
+                    const high = (data.high ?? data.temp_high ?? data.max_temp ?? data.high_temperature);
+                    const preferred = pickPreferredTemp(data);
+                    // Build a date/time label using the selected date input or data payload
+                    const dataDate = (data.date || data.valid_date || data.forecast_date || dateInput.value);
+                    let whenLabel = '';
+                    if (preferred.source === '1pm') {
+                        whenLabel = `Forecast for ${dataDate} at 1 PM`;
+                    } else if (preferred.source === 'high') {
+                        whenLabel = `Forecast for ${dataDate} (Daily High)`;
+                    } else {
+                        whenLabel = `Forecast for ${dataDate} (Current)`;
+                    }
                     let weatherHtml = `
                         <div class="row">
                             <div class="col-md-4 text-center">
-                                <h1>${data.temperature}°${data.units === 'imperial' ? 'F' : 'C'}</h1>
-                                <p class="lead">${data.description}</p>
+                                <h1>${preferred.value}°${unitsSymbol}</h1>
+                                <div><span class="badge bg-dark">${preferred.label}</span></div>
+                                <div class="text-muted small mt-1">${whenLabel}</div>
+                                <p class="lead">${data.description || ''}</p>
                             </div>
                             <div class="col-md-8">
                                 <ul class="list-group">
+                                    ${high !== undefined && high !== null ? `<li class="list-group-item d-flex justify-content-between align-items-center">High<span class="badge bg-danger">${high}°${unitsSymbol}</span></li>` : ''}
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Chance of Precipitation
-                                        <span class="badge bg-primary">${data.precipitation}%</span>
+                                        <span class="badge bg-primary">${(data.precipitation ?? '-') + '%'}</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Humidity
-                                        <span class="badge bg-secondary">${data.humidity}%</span>
+                                        <span class="badge bg-secondary">${(data.humidity ?? '-') + '%'}</span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Wind
-                                        <span class="badge bg-info">${data.wind} mph</span>
+                                        <span class="badge bg-info">${data.wind ?? '-'} ${windUnits}</span>
                                     </li>
                                 </ul>
                             </div>
@@ -289,30 +434,64 @@
                 });
         }
         
-        // Load teams for the selected division
+        // Load teams for the selected division and render as checkboxes
         function loadTeamsForDivision() {
             const divisionId = divisionSelect.value;
             if (!divisionId) {
                 // Clear teams if no division selected
                 participatingTeamsSelect.innerHTML = '';
+                participatingTeamsContainer.innerHTML = '';
                 return;
             }
             
-            // Clear current team options
+            // Clear current team options and checkboxes
             participatingTeamsSelect.innerHTML = '';
+            participatingTeamsContainer.innerHTML = '';
             
             // Fetch teams for the selected division
             fetch(`/officials/api/divisions/${divisionId}/teams/`)
                 .then(response => response.json())
                 .then(teams => {
-                    // Add team options
+                    // Build hidden select options and visible checkboxes
                     teams.forEach(team => {
+                        // Hidden select option
                         const option = document.createElement('option');
                         option.value = team.id;
                         option.textContent = team.name;
                         participatingTeamsSelect.appendChild(option);
+                        
+                        // Visible checkbox
+                        const col = document.createElement('div');
+                        col.className = 'col-md-6';
+                        const formCheck = document.createElement('div');
+                        formCheck.className = 'form-check';
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.className = 'form-check-input team-checkbox';
+                        input.id = `team_${team.id}`;
+                        input.value = team.id;
+                        const label = document.createElement('label');
+                        label.className = 'form-check-label';
+                        label.setAttribute('for', input.id);
+                        label.textContent = team.name;
+                        formCheck.appendChild(input);
+                        formCheck.appendChild(label);
+                        col.appendChild(formCheck);
+                        participatingTeamsContainer.appendChild(col);
                     });
-                    
+
+                    // Pre-check based on hidden select's existing selected options (e.g., edit mode)
+                    const preselected = Array.from(participatingTeamsSelect.options).filter(o => o.selected).map(o => o.value);
+                    if (preselected.length) {
+                        preselected.forEach(id => {
+                            const cb = document.getElementById(`team_${id}`);
+                            if (cb) cb.checked = true;
+                        });
+                    }
+
+                    // Sync hidden select selections from checkboxes
+                    syncParticipatingTeamsSelect();
+
                     // Re-validate team count after updating options
                     validateTeamCount();
                 })
@@ -322,24 +501,29 @@
         }
         
         // Update host team dropdown to only show participating teams
+        function getSelectedTeamIds() {
+            return Array.from(document.querySelectorAll('#participating-teams-checkboxes .team-checkbox:checked')).map(cb => cb.value);
+        }
+
         function updateHostTeamOptions() {
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
+            const selectedTeamIds = getSelectedTeamIds();
             
             // Clear current host team options
             hostTeamSelect.innerHTML = '<option value="">---------</option>';
             
             // Add options for each participating team
-            selectedTeams.forEach(option => {
+            selectedTeamIds.forEach(id => {
                 const hostOption = document.createElement('option');
-                hostOption.value = option.value;
-                hostOption.textContent = option.textContent;
+                hostOption.value = id;
+                // Find label text from checkbox label
+                const label = document.querySelector(`#team_${id} + label`);
+                hostOption.textContent = label ? label.textContent : id;
                 hostTeamSelect.appendChild(hostOption);
             });
             
             // If current host team is not in participating teams, clear it
             const currentHostTeam = hostTeamSelect.value;
-            const participatingTeamIds = selectedTeams.map(option => option.value);
-            if (currentHostTeam && !participatingTeamIds.includes(currentHostTeam)) {
+            if (currentHostTeam && !selectedTeamIds.includes(currentHostTeam)) {
                 hostTeamSelect.value = '';
                 // Clear pools since host team was cleared
                 poolSelect.innerHTML = '<option value="">---------</option>';
@@ -352,7 +536,7 @@
         // Validation for meet type and participating teams
         function validateTeamCount() {
             const meetType = meetTypeSelect.value;
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions).length;
+            const selectedTeams = getSelectedTeamIds().length;
             
             if (meetType === 'dual' && selectedTeams !== 2) {
                 teamValidationMessage.textContent = 'Dual meets must have exactly 2 participating teams.';
@@ -370,13 +554,13 @@
         
         function validateHostTeam() {
             const meetType = meetTypeSelect.value;
-            const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
+            const selectedTeamIds = getSelectedTeamIds();
             const hostTeamId = hostTeamSelect.value;
             
             if (meetType === 'dual') {
                 // For dual meets, host team must be one of the participating teams
                 if (hostTeamId) {
-                    const isParticipating = Array.from(selectedTeams).some(team => team.value === hostTeamId);
+                    const isParticipating = selectedTeamIds.includes(hostTeamId);
                     if (!isParticipating) {
                         hostTeamValidationMessage.textContent = 'Host team must be one of the participating teams.';
                         hostTeamValidationAlert.style.display = 'block';
@@ -413,8 +597,7 @@
                 hostTeamSelect.required = true;
                 
                 // Filter host team options to only include participating teams
-                const selectedTeams = Array.from(participatingTeamsSelect.selectedOptions);
-                const selectedTeamIds = selectedTeams.map(option => option.value);
+                const selectedTeamIds = getSelectedTeamIds();
                 
                 Array.from(hostTeamSelect.options).forEach(option => {
                     if (option.value === '') return; // Skip empty option
@@ -438,15 +621,45 @@
             loadPoolsForTeam();
             validateHostTeam();
         });
-        poolSelect.addEventListener('change', getWeatherForecast);
-        dateInput.addEventListener('change', getWeatherForecast);
+        poolSelect.addEventListener('change', function() {
+            getWeatherForecast();
+            updateAutoName();
+        });
+        dateInput.addEventListener('change', function() {
+            getWeatherForecast();
+            updateAutoName();
+        });
         meetTypeSelect.addEventListener('change', function() {
             updateHostTeamField();
             validateTeamCount();
+            updateAutoName();
+            // Reload pools based on meet type
+            if (meetTypeSelect.value === 'dual') {
+                loadPoolsForTeam();
+            } else {
+                loadPoolsForParticipatingTeams();
+            }
         });
-        participatingTeamsSelect.addEventListener('change', function() {
-            updateHostTeamOptions();
-            validateTeamCount();
+        // Delegate checkbox change events
+        participatingTeamsContainer.addEventListener('change', function(e) {
+            if (e.target && e.target.classList.contains('team-checkbox')) {
+                // Enforce dual meet max 2 selection
+                if (meetTypeSelect.value === 'dual') {
+                    const checked = getSelectedTeamIds();
+                    if (checked.length > 2) {
+                        e.target.checked = false;
+                        teamValidationMessage.textContent = 'Dual meets must have exactly 2 participating teams.';
+                        teamValidationAlert.style.display = 'block';
+                        return;
+                    }
+                }
+                syncParticipatingTeamsSelect();
+                updateHostTeamOptions();
+                validateTeamCount();
+                if (meetTypeSelect.value !== 'dual') {
+                    loadPoolsForParticipatingTeams();
+                }
+            }
         });
         leagueSelect.addEventListener('change', loadDivisionsForLeague);
         divisionSelect.addEventListener('change', loadTeamsForDivision);
@@ -468,6 +681,11 @@
             loadPoolsForTeam();
         }
         
+        // If non-dual and participating teams preselected, load their pools
+        if (meetTypeSelect.value !== 'dual' && getSelectedTeamIds().length > 0) {
+            loadPoolsForParticipatingTeams();
+        }
+
         // Load divisions if league is already selected (e.g. when editing)
         if (leagueSelect.value) {
             loadDivisionsForLeague();
@@ -480,9 +698,16 @@
         
         // Add event listener to form submission
         document.getElementById('meetForm').addEventListener('submit', function(event) {
+            // Ensure hidden select reflects current checkbox state
+            syncParticipatingTeamsSelect();
             if (!validateTeamCount()) {
                 event.preventDefault();
             }
+        });
+
+        // If user types in the name, stop auto-updates
+        nameInput.addEventListener('input', function() {
+            nameInput.dataset.autofilled = 'false';
         });
     });
 </script>

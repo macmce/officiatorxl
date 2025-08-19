@@ -1,4 +1,5 @@
 from django.db import models
+import datetime
 from django.conf import settings
 from django.utils import timezone
 from django.core.validators import RegexValidator, MinValueValidator, MaxValueValidator
@@ -128,6 +129,7 @@ class Meet(models.Model):
     
     name = models.CharField(max_length=200)
     date = models.DateField()
+    start_time = models.TimeField(default=datetime.time(8, 30))
     league = models.ForeignKey(League, on_delete=models.CASCADE, related_name='meets')
     division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name='meets', null=True, blank=True)
     host_team = models.ForeignKey(Team, on_delete=models.CASCADE, related_name='hosted_meets')
@@ -135,6 +137,7 @@ class Meet(models.Model):
     participating_teams = models.ManyToManyField(Team, related_name='meets')
     meet_type = models.CharField(max_length=20, choices=MEET_TYPE_CHOICES, default='dual')
     weather_forecast = models.JSONField(null=True, blank=True)
+    strategy = models.ForeignKey('Strategy', on_delete=models.SET_NULL, null=True, blank=True, related_name='meets')
     
     def __str__(self):
         return f"{self.name} - {self.date}"
@@ -300,3 +303,22 @@ class EventPosition(models.Model):
     def __str__(self):
         mandatory_status = "Mandatory" if self.is_mandatory else "Optional"
         return f"{self.position.role} for {self.event} ({mandatory_status})"
+
+
+class MeetSchedule(models.Model):
+    """Persisted schedule built for a meet."""
+    BUILD_CHOICES = [
+        ("LIGHTEST", "Lightest"),
+        ("HEAVIEST", "Heaviest"),
+    ]
+
+    meet = models.ForeignKey(Meet, on_delete=models.CASCADE, related_name='schedules')
+    name = models.CharField(max_length=255)
+    build_option = models.CharField(max_length=20, choices=BUILD_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name

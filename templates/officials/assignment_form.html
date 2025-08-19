@@ -9,9 +9,19 @@
         <h1 class="h2">
             <i class="fas fa-clipboard-list me-2"></i>{{ title }}
         </h1>
-        <a href="{% url 'assignment_list' %}" class="btn btn-outline-secondary">
-            <i class="fas fa-chevron-left me-1"></i>Back to Assignments
-        </a>
+        {% if preselected_meet %}
+            <a href="{% url 'meet_detail' pk=preselected_meet.pk %}" class="btn btn-outline-secondary">
+                <i class="fas fa-chevron-left me-1"></i>Back to Meet
+            </a>
+        {% elif assignment %}
+            <a href="{% url 'meet_detail' pk=assignment.meet.pk %}" class="btn btn-outline-secondary">
+                <i class="fas fa-chevron-left me-1"></i>Back to Meet
+            </a>
+        {% else %}
+            <a href="{% url 'assignment_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-chevron-left me-1"></i>Back to Assignments
+            </a>
+        {% endif %}
     </div>
 
     <div class="row">
@@ -26,20 +36,57 @@
                         
                         <div class="row">
                             <div class="col-md-6">
-                                {{ form.official|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
                                 {{ form.meet|as_crispy_field }}
                             </div>
                         </div>
+
+                        <hr class="my-4">
+                        <div class="mb-2">
+                            <strong>Assign an existing official</strong>
+                            <div class="text-muted small">Choose someone already in the system. Do not fill in the new official fields below if you select an existing official.</div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">{{ form.official|as_crispy_field }}</div>
+                            <div class="col-md-6">{{ form.role|as_crispy_field }}</div>
+                        </div>
+
+                        {% if not assignment %}
+                        <div class="text-center my-3">
+                            <span class="text-muted">— or —</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Create a new official</strong>
+                            <div class="text-muted small">Enter full details to add a new official to the system. Leave the existing official field above blank.</div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">{{ form.new_official_name|as_crispy_field }}</div>
+                            <div class="col-md-6">{{ form.new_official_team|as_crispy_field }}</div>
+                            <div class="col-md-6">{{ form.new_official_email|as_crispy_field }}</div>
+                            <div class="col-md-6">{{ form.new_official_phone|as_crispy_field }}</div>
+                            <div class="col-md-6">{{ form.new_official_certification|as_crispy_field }}</div>
+                            <div class="col-md-6">{{ form.new_official_proficiency|as_crispy_field }}</div>
+                            <div class="col-md-6 d-flex align-items-center">{{ form.new_official_active|as_crispy_field }}</div>
+                        </div>
+                        {% endif %}
                         
                         <div class="row">
                             <div class="col-md-6">
-                                {{ form.role|as_crispy_field }}
+                                <label class="form-label d-block">Confirmed</label>
+                                {% if assignment %}
+                                    {% if assignment.confirmed %}
+                                        <span class="badge bg-success">Confirmed</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Unconfirmed</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">Unconfirmed</span>
+                                {% endif %}
                             </div>
+                            {% if assignment and form.official_proficiency %}
                             <div class="col-md-6">
-                                {{ form.confirmed|as_crispy_field }}
+                                {{ form.official_proficiency|as_crispy_field }}
                             </div>
+                            {% endif %}
                         </div>
                         
                         {{ form.notes|as_crispy_field }}
@@ -55,4 +102,42 @@
         </div>
     </div>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const officialSelect = document.getElementById('id_official');
+    const fieldIds = [
+        'id_new_official_name',
+        'id_new_official_team',
+        'id_new_official_email',
+        'id_new_official_phone',
+        'id_new_official_certification',
+        'id_new_official_proficiency',
+        'id_new_official_active'
+    ];
+    const newFields = fieldIds.map(id => document.getElementById(id)).filter(Boolean);
+
+    function setDisabled(disabled) {
+        newFields.forEach(el => {
+            if (!el) return;
+            el.disabled = disabled;
+            // Try to dim the wrapper for visual cue
+            const group = el.closest('.form-group, .mb-3, .col-md-6');
+            if (group) {
+                if (disabled) group.classList.add('opacity-50');
+                else group.classList.remove('opacity-50');
+            }
+        });
+    }
+
+    function update() {
+        const hasExisting = officialSelect && officialSelect.value !== '';
+        setDisabled(hasExisting);
+    }
+
+    if (officialSelect) {
+        officialSelect.addEventListener('change', update);
+    }
+    update();
+});
+</script>
 {% endblock %}
