@@ -84,7 +84,7 @@ The application follows a services-oriented architecture for complex business lo
    ```bash
    python manage.py runserver
    ```
-7. **Access the application**: Open a web browser and navigate to `http://127.0.0.1:8000/`.
+8. **Access the application**: Open a web browser and navigate to `http://127.0.0.1:8000/`.
 
 ## Running Tests
 
@@ -107,6 +107,12 @@ For more verbose output (e.g., to see individual test names, level 2 verbosity):
    ```bash
    python manage.py test -v 2
    ```
+
+Alternatively, you can use pytest (configured via `pytest.ini`):
+
+```bash
+pytest -q
+```
 
 ## Usage Workflow
 
@@ -222,10 +228,15 @@ All API endpoints are accessible under the `/api/v1/officials/` base URL:
 
 ### API Authentication
 
-The API uses token-based authentication. To access protected endpoints, include an Authentication header with your request:
+Authentication is handled via Django REST Framework's Session and Basic authentication (see `officiatorxl/settings.py` → `REST_FRAMEWORK['DEFAULT_AUTHENTICATION_CLASSES']`).
 
-```
-Authentication: Token <your-token>
+- Use session auth by logging in at `/users/login/` via the web UI, then access API endpoints in the same browser session.
+- For programmatic access, use HTTP Basic Auth with a valid username and password.
+
+Example with curl (Basic Auth):
+
+```bash
+curl -u username:password http://127.0.0.1:8000/api/v1/officials/leagues/
 ```
 
 ## Heroku Deployment
