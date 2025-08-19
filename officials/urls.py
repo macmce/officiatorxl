@@ -76,9 +76,9 @@ urlpatterns = [
     path('assignments/<int:pk>/delete/', views.assignment_delete, name='assignment_delete'),
     path('assignments/<int:pk>/toggle-confirm/', views_meets.toggle_assignment_confirm, name='assignment_toggle_confirm'),
     
-    # Event URLs
-    path('events/', views_events.EventListView.as_view(), name='event-list'),
-    path('events/<int:pk>/', views_events.EventDetailView.as_view(), name='event-detail'),
+    # Event URLs (use underscore names to avoid DRF name collision)
+    path('events/', views_events.EventListView.as_view(), name='event_list'),
+    path('events/<int:pk>/', views_events.EventDetailView.as_view(), name='event_detail'),
     path('events/new/', views_events.EventCreateView.as_view(), name='event-create'),
     path('events/<int:pk>/edit/', views_events.EventUpdateView.as_view(), name='event-update'),
     path('events/<int:pk>/delete/', views_events.EventDeleteView.as_view(), name='event-delete'),

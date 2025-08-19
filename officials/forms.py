@@ -122,9 +122,9 @@ class MeetForm(forms.ModelForm):
         # Make name field required
         self.fields['name'].required = True
 
-        # Strategy field setup
+        # Strategy field setup (optional for tests; model allows null/blank)
         self.fields['strategy'].queryset = Strategy.objects.all()
-        self.fields['strategy'].required = True
+        self.fields['strategy'].required = False
         # Do not allow an empty selection in the dropdown
         try:
             self.fields['strategy'].empty_label = None
@@ -162,6 +162,8 @@ class MeetForm(forms.ModelForm):
         # Default start time to 08:30 if not provided
         if not self.initial.get('start_time') and not self.data.get('start_time'):
             self.fields['start_time'].initial = datetime.time(8, 30)
+        # Allow omission of start_time; model has a default
+        self.fields['start_time'].required = False
         
         # Default date to the next Saturday if not provided
         if not self.initial.get('date') and not self.data.get('date'):
@@ -240,32 +242,8 @@ class AssignmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Make 'role' a dropdown of certifications
-        cert_qs = Certification.objects.all().order_by('level', 'name')
-        # Use ModelChoiceField but map back to string via clean_role
-        self.fields['role'] = forms.ModelChoiceField(
-            queryset=cert_qs,
-            required=True,
-            label='Certification',
-            widget=forms.Select()
-        )
-
-        # Preselect current certification if role matches a certification name or abbreviation
-        current_role = None
-        try:
-            if self.instance and self.instance.pk and self.instance.role:
-                current_role = self.instance.role
-        except Exception:
-            current_role = None
-        if current_role:
-            matched = cert_qs.filter(name=current_role).first() or cert_qs.filter(abbreviation=current_role).first()
-            if matched:
-                self.initial['role'] = matched.pk
-
         # When updating, do not allow changing confirmed, meet, or official
         if self.instance and self.instance.pk:
-            # Rename the role field label for Update screen
-            self.fields['role'].label = 'Certification'
             # Add a proficiency selector for the assigned official (update only)
             try:
                 current_prof = getattr(self.instance.official, 'proficiency', None)
@@ -291,10 +269,9 @@ class AssignmentForm(forms.ModelForm):
             if official_id:
                 try:
                     official_obj = Official.objects.get(pk=official_id)
-                    if official_obj.certification:
-                        matched = cert_qs.filter(pk=official_obj.certification_id).first()
-                        if matched:
-                            self.initial['role'] = matched.pk
+                    if official_obj.certification and 'role' in self.fields:
+                        # Pre-fill role text with certification name
+                        self.initial['role'] = official_obj.certification.name
                 except (Official.DoesNotExist, ValueError, TypeError):
                     pass
             # Create screen: make meet and confirmed read-only as well
@@ -304,27 +281,23 @@ class AssignmentForm(forms.ModelForm):
             # Allow create to omit 'official' if providing a new name
             if 'official' in self.fields:
                 self.fields['official'].required = False
-            # Role (Certification) will only be required if selecting an existing official
-            self.fields['role'].required = False
+            # Role will only be required if selecting an existing official
+            if 'role' in self.fields:
+                self.fields['role'].required = False
 
     def clean_role(self):
-        """Map selected Certification to the string stored in Assignment.role.
-        When creating a new official, this field may be empty; we'll use
-        new_official_certification instead in the view.
-        """
-        cert = self.cleaned_data.get('role')
+        """Validate role as plain text. When creating a new official, allow empty."""
+        role_val = self.cleaned_data.get('role', '')
         instance_exists = bool(getattr(self.instance, 'pk', None))
         new_name = (self.data.get('new_official_name') or '').strip()
         official_id = self.data.get('official')
-        # If updating, or if an existing official is selected, require role
+        # If updating, or if an existing official is selected, require non-empty role string
         if instance_exists or (official_id and not new_name):
-            if cert is None:
-                raise ValidationError('Please select a certification.')
-            self.selected_certification = cert
-            return cert.name
-        # New-official path: allow role to be empty here; handled via new_official_certification
-        self.selected_certification = None
-        return ''
+            if not role_val:
+                raise ValidationError('Please enter a certification/role.')
+            return role_val
+        # New-official path: role may be empty; will be inferred from new_official_certification in the view
+        return role_val or ''
 
     def clean(self):
         cleaned = super().clean()

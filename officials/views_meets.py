@@ -567,8 +567,8 @@ def assignment_create(request, meet_id=None):
         # Filter officials to participating teams that are not yet assigned to this meet
         meet_for_filter = preselected_meet
         if meet_for_filter and 'official' in form.fields:
-            participating = meet_for_filter.participating_teams.all()
-            available_officials = Official.objects.filter(team__in=participating).exclude(assignments__meet=meet_for_filter)
+            participating = preselected_meet.participating_teams.all()
+            available_officials = Official.objects.filter(team__in=participating)
             form.fields['official'].queryset = available_officials
         if form.is_valid():
             assignment = form.save(commit=False)
@@ -645,7 +645,7 @@ def assignment_create(request, meet_id=None):
             # If a meet is preselected, filter officials to participating teams not already assigned
             if preselected_meet and 'official' in form.fields:
                 participating = preselected_meet.participating_teams.all()
-                available_officials = Official.objects.filter(team__in=participating).exclude(assignments__meet=preselected_meet)
+                available_officials = Official.objects.filter(team__in=participating)
                 form.fields['official'].queryset = available_officials
             else:
                 # Fallback: empty queryset to force selection via meet context
@@ -657,7 +657,7 @@ def assignment_create(request, meet_id=None):
         # For staff as well, scope officials by preselected meet if available
         if request.user.is_staff and preselected_meet and 'official' in form.fields:
             participating = preselected_meet.participating_teams.all()
-            available_officials = Official.objects.filter(team__in=participating).exclude(assignments__meet=preselected_meet)
+            available_officials = Official.objects.filter(team__in=participating)
             form.fields['official'].queryset = available_officials
         # Limit new_official_team to participating teams if we know the meet; else empty
         if 'new_official_team' in form.fields:

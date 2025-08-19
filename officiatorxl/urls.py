@@ -24,8 +24,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', RedirectView.as_view(pattern_name='dashboard'), name='home'),  # Redirect root to dashboard
     path('users/', include('users.urls')),  # Include user app URLs
-    path('officials/', include('officials.urls')),  # Include officials app URLs
-    path('api/v1/officials/', include('officials.api_urls', namespace='officials_api')), # Include officials app API URLs
+    # Include API URLs first so reverse() picks DRF route names (e.g., 'event-list') over similarly named HTML views
+    path('api/v1/officials/', include('officials.api_urls')),  # Include officials app API URLs
+    path('officials/', include('officials.urls')),  # Include officials app URLs (no namespace)
 ]
 
 # Serve static and media files in development
