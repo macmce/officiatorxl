@@ -274,9 +274,10 @@ class AssignmentForm(forms.ModelForm):
                         self.initial['role'] = official_obj.certification.name
                 except (Official.DoesNotExist, ValueError, TypeError):
                     pass
-            # Create screen: make confirmed read-only; allow selecting meet in general create
-            if 'confirmed' in self.fields:
-                self.fields['confirmed'].disabled = True
+            # Create screen: make meet and confirmed read-only as well
+            for fname in ['meet', 'confirmed']:
+                if fname in self.fields:
+                    self.fields[fname].disabled = True
             # Allow create to omit 'official' if providing a new name
             if 'official' in self.fields:
                 self.fields['official'].required = False

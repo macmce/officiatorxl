@@ -570,9 +570,6 @@ def assignment_create(request, meet_id=None):
             participating = preselected_meet.participating_teams.all()
             available_officials = Official.objects.filter(team__in=participating)
             form.fields['official'].queryset = available_officials
-        elif not request.user.is_staff and 'official' in form.fields:
-            # General create (no preselected meet): show officials from user's leagues
-            form.fields['official'].queryset = Official.objects.filter(team__division__league__in=user_leagues)
         if form.is_valid():
             assignment = form.save(commit=False)
 
@@ -651,8 +648,8 @@ def assignment_create(request, meet_id=None):
                 available_officials = Official.objects.filter(team__in=participating)
                 form.fields['official'].queryset = available_officials
             else:
-                # General create: show officials from user's leagues
-                form.fields['official'].queryset = Official.objects.filter(team__division__league__in=user_leagues)
+                # Fallback: empty queryset to force selection via meet context
+                form.fields['official'].queryset = Official.objects.none()
         else:
             # Staff can choose any team
             if 'new_official_team' in form.fields:
