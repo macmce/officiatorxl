@@ -666,6 +666,13 @@ def assignment_create(request, meet_id=None):
                 posted_meet_id = request.POST.get('meet')
                 posted_official_id = request.POST.get('official')
                 posted_role = (request.POST.get('role') or '').strip()
+                # If user provided BOTH an existing official and new official details,
+                # do NOT attempt fallback manual creation. Let form errors render (200).
+                both_existing_and_new = bool(posted_official_id) and bool((request.POST.get('new_official_name') or '').strip())
+                if both_existing_and_new:
+                    # Surface a clear message expected by tests
+                    messages.error(request, 'Please either select an existing official or enter a new official, not both.')
+                    raise ValueError('Both existing and new official provided')
                 if not preselected_meet and not posted_meet_id:
                     raise ValueError('Meet not provided')
                 # Resolve meet

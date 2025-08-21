@@ -151,6 +151,13 @@ class MeetForm(forms.ModelForm):
                 self.fields['division'].queryset = Division.objects.filter(league_id=league_id)
             except (ValueError, TypeError):
                 self.fields['division'].queryset = Division.objects.none()
+        elif self.initial.get('league'):
+            # New form load with preselected league in initial data
+            try:
+                league_id = int(self.initial.get('league'))
+                self.fields['division'].queryset = Division.objects.filter(league_id=league_id)
+            except (ValueError, TypeError):
+                self.fields['division'].queryset = Division.objects.none()
         else:
             # New meet form load - start with empty division queryset
             self.fields['division'].queryset = Division.objects.none()
